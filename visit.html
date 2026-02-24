@@ -219,15 +219,15 @@ function showReward(first,progress,earned,used=false){
 
   if(first){
     document.getElementById("rewardMessage").innerHTML =
-      "🎁 Tebrikler! 2. kahveniz hediye! Bir sonraki ziyaretinizde kullanabilirsiniz.";
+      "🎁 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.";
   }
   else if(used){
     document.getElementById("rewardMessage").innerHTML =
-      "☕ Hediyenizi kullandınız! Yeni kahve yolculuğunuz başladı.";
+      "☕ Ödülünüzü kullandınız! Yeni ödül yolculuğunuz başladı.";
   }
   else if(earned){
     document.getElementById("rewardMessage").innerHTML =
-      "🎉 4/4 tamamlandı! Bir sonraki ziyaretinizde ücretsiz kahve kazanacaksınız!";
+      "🎉 4/4 tamamlandı! Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
   }
   else{
     document.getElementById("rewardMessage").innerHTML =
