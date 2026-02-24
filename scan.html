@@ -74,7 +74,11 @@ async function init() {
     return;
   }
 
-  if (new Date(tokenData.expires_at) < new Date()) {
+  // 🔥 Güvenli zaman kontrolü (ms karşılaştırması)
+  const nowMs = Date.now();
+  const expireMs = new Date(tokenData.expires_at).getTime();
+
+  if (nowMs > expireMs) {
     showError("QR süresi dolmuş");
     return;
   }
@@ -92,7 +96,6 @@ async function completeVisit() {
 
   if (!phone) return;
 
-  // müşteri var mı
   let { data: existingCustomer } = await supabaseClient
     .from("customers")
     .select("*")
@@ -119,7 +122,6 @@ async function completeVisit() {
     customerId = existingCustomer.id;
   }
 
-  // ziyaret ekle
   await supabaseClient
     .from("visits")
     .insert({
@@ -128,7 +130,6 @@ async function completeVisit() {
       spending_band: currentBand
     });
 
-  // token used yap
   await supabaseClient
     .from("visit_tokens")
     .update({ used: true })
