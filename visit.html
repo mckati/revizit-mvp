@@ -8,7 +8,7 @@
 
 <body class="bg-gray-100 flex items-center justify-center h-screen">
 
-<div class="bg-white p-8 rounded-xl shadow w-96 text-center space-y-6">
+<div class="bg-white p-8 rounded-2xl shadow-xl w-96 text-center space-y-6">
 
   <h1 class="text-xl font-bold">Ziyaret Onayı</h1>
 
@@ -30,25 +30,28 @@
   </div>
 
   <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
-    <div class="relative w-32 h-40">
 
-      <!-- Cup Outline -->
-      <svg viewBox="0 0 120 160" class="absolute inset-0 w-full h-full">
-        <path d="M30 20 L90 20 L80 150 L40 150 Z"
-              fill="none"
-              stroke="#000"
-              stroke-width="3"/>
-        <!-- Level lines -->
-        <line x1="40" y1="115" x2="80" y2="115" stroke="#999" stroke-width="2"/>
-        <line x1="40" y1="85" x2="80" y2="85" stroke="#999" stroke-width="2"/>
-        <line x1="40" y1="55" x2="80" y2="55" stroke="#999" stroke-width="2"/>
-      </svg>
+    <!-- GERÇEKÇİ KARTON BARDAK -->
+    <div class="relative w-40 h-56">
 
-      <!-- Coffee Fill -->
-      <div id="coffeeFill"
-        class="absolute bottom-0 left-1/2 -translate-x-1/2 w-20 bg-amber-700 rounded-b-lg transition-all duration-700"
-        style="height:0%;">
+      <!-- Kapak -->
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-gray-800 rounded-t-full"></div>
+
+      <!-- Bardak Gövde -->
+      <div class="absolute top-5 left-1/2 -translate-x-1/2 w-28 h-44 bg-white border-4 border-gray-300 rounded-b-3xl overflow-hidden shadow-inner">
+
+        <!-- Kahve Dolum -->
+        <div id="coffeeFill"
+          class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-amber-800 to-amber-600 transition-all duration-700"
+          style="height:0%;">
+        </div>
+
       </div>
+
+      <!-- Seviye Çizgileri -->
+      <div class="absolute top-16 left-1/2 -translate-x-1/2 w-20 border-t border-gray-300"></div>
+      <div class="absolute top-26 left-1/2 -translate-x-1/2 w-20 border-t border-gray-300"></div>
+      <div class="absolute top-36 left-1/2 -translate-x-1/2 w-20 border-t border-gray-300"></div>
 
     </div>
 
@@ -73,23 +76,20 @@ let tokenValue = null;
 const phoneInput = document.getElementById("phone");
 const confirmBtn = document.getElementById("confirmBtn");
 
-/* ================= PHONE FORMAT ================= */
+/* TELEFON FORMAT */
 
 phoneInput?.addEventListener("input", function(e) {
-
   let digits = e.target.value.replace(/\D/g, "");
-
-  if (digits.length > 11) digits = digits.slice(0, 11);
+  if (digits.length > 11) digits = digits.slice(0,11);
 
   let formatted = "";
-
-  if (digits.length > 0) formatted += digits.substring(0, 4);
-  if (digits.length >= 5) formatted += " " + digits.substring(4, 7);
-  if (digits.length >= 8) formatted += " " + digits.substring(7, 11);
+  if (digits.length > 0) formatted += digits.substring(0,4);
+  if (digits.length >= 5) formatted += " " + digits.substring(4,7);
+  if (digits.length >= 8) formatted += " " + digits.substring(7,11);
 
   e.target.value = formatted;
 
-  if (/^05\d{9}$/.test(digits)) {
+  if(/^05\d{9}$/.test(digits)){
     confirmBtn.disabled = false;
     confirmBtn.classList.remove("bg-gray-300","cursor-not-allowed");
     confirmBtn.classList.add("bg-black");
@@ -98,13 +98,28 @@ phoneInput?.addEventListener("input", function(e) {
   }
 });
 
-function cleanPhoneNumber(v){ return v.replace(/\D/g,""); }
+function cleanPhone(v){ return v.replace(/\D/g,""); }
 
-/* ================= FLOW ================= */
+/* INIT */
 
-function getTokenFromURL(){
-  const params = new URLSearchParams(window.location.search);
-  return params.get("token");
+function getToken(){
+  return new URLSearchParams(window.location.search).get("token");
+}
+
+async function init(){
+  tokenValue = getToken();
+  if(!tokenValue){ showError("Geçersiz QR."); return; }
+
+  const { data } = await supabaseClient
+    .from("qr_tokens")
+    .select("*")
+    .eq("token",tokenValue)
+    .single();
+
+  if(!data){ showError("QR geçersiz."); return; }
+
+  tokenData = data;
+  document.getElementById("phoneArea").classList.remove("hidden");
 }
 
 function showError(msg){
@@ -112,102 +127,82 @@ function showError(msg){
     `<p class="text-red-500 text-sm">${msg}</p>`;
 }
 
-function showPhoneInput(){
-  document.getElementById("status").innerHTML =
-    `<p class="text-sm text-gray-500">Telefon numaranızı girin</p>`;
-  document.getElementById("phoneArea").classList.remove("hidden");
-}
-
-async function init(){
-
-  tokenValue = getTokenFromURL();
-  if(!tokenValue){ showError("Geçersiz QR."); return; }
-
-  const { data } = await supabaseClient
-    .from("qr_tokens")
-    .select("*")
-    .eq("token", tokenValue)
-    .single();
-
-  if(!data){ showError("QR geçersiz veya kullanılmış."); return; }
-
-  if(new Date(data.expires_at) < new Date()){
-    showError("QR süresi dolmuş.");
-    return;
-  }
-
-  tokenData = data;
-  showPhoneInput();
-}
-
-/* ================= VISIT ================= */
+/* ANA AKIŞ */
 
 async function completeVisit(){
 
-  let phone = cleanPhoneNumber(phoneInput.value);
-
+  const phone = cleanPhone(phoneInput.value);
   if(!/^05\d{9}$/.test(phone)){
     showError("Geçerli numara giriniz.");
     return;
   }
 
   const businessId = tokenData.business_id;
-  const band = tokenData.spending_band;
 
-  let { data: customer } = await supabaseClient
+  let { data:customer } = await supabaseClient
     .from("customers")
     .select("*")
-    .eq("phone", phone)
-    .eq("business_id", businessId)
+    .eq("phone",phone)
+    .eq("business_id",businessId)
     .single();
-
-  let customerId;
 
   if(!customer){
     const { data:newCustomer } = await supabaseClient
       .from("customers")
-      .insert({ phone, business_id:businessId })
+      .insert({
+        phone,
+        business_id:businessId,
+        reward_available:true,
+        reward_progress:0
+      })
       .select().single();
-    customerId = newCustomer.id;
-  } else {
-    customerId = customer.id;
-  }
 
-  // Günlük limit
-  const todayStart = new Date();
-  todayStart.setHours(0,0,0,0);
-
-  const { data:todayVisits } = await supabaseClient
-    .from("visits")
-    .select("*")
-    .eq("business_id", businessId)
-    .eq("customer_id", customerId)
-    .gte("visit_date", todayStart.toISOString());
-
-  if(todayVisits.length>0){
-    showError("Bugün zaten ziyaret kaydınız var.");
+    showReward(true,0,true);
     return;
   }
 
-  await supabaseClient
-    .from("visits")
-    .insert({
-      business_id:businessId,
-      customer_id:customerId,
-      spending_band:band
-    });
+  // Eğer ödül varsa kullan
+  if(customer.reward_available){
+    await supabaseClient
+      .from("customers")
+      .update({
+        reward_available:false,
+        reward_progress:1
+      })
+      .eq("id",customer.id);
 
-  await supabaseClient
-    .from("qr_tokens")
-    .delete()
-    .eq("token", tokenValue);
+    showReward(false,1,false,true);
+    return;
+  }
 
-  showCupAnimation(customerId,businessId);
+  // Normal ziyaret → progress artır
+  let newProgress = customer.reward_progress + 1;
+
+  if(newProgress >= 4){
+    await supabaseClient
+      .from("customers")
+      .update({
+        reward_available:true,
+        reward_progress:0
+      })
+      .eq("id",customer.id);
+
+    showReward(false,4,true);
+  } else {
+    await supabaseClient
+      .from("customers")
+      .update({
+        reward_progress:newProgress
+      })
+      .eq("id",customer.id);
+
+    showReward(false,newProgress,false);
+  }
 }
 
-/* ================= CUP ANIMATION ================= */
+/* GÖRSEL */
 
-async function showCupAnimation(customerId,businessId){
+function showReward(first,progress,earned,used=false){
 
   document.getElementById("status").innerHTML =
     `<p class="text-green-600 font-semibold">
@@ -217,33 +212,31 @@ async function showCupAnimation(customerId,businessId){
   document.getElementById("phoneArea").classList.add("hidden");
   document.getElementById("cupArea").classList.remove("hidden");
 
-  const { data:visits } = await supabaseClient
-    .from("visits")
-    .select("*")
-    .eq("business_id",businessId)
-    .eq("customer_id",customerId);
-
-  const visitCount = visits.length;
-  const level = visitCount % 4 === 0 ? 4 : visitCount % 4;
-
-  const fillPercent = level * 25;
-
+  let fill = progress * 25;
   setTimeout(()=>{
-    document.getElementById("coffeeFill")
-      .style.height = fillPercent + "%";
+    document.getElementById("coffeeFill").style.height = fill + "%";
   },200);
 
-  if(level === 4){
+  if(first){
     document.getElementById("rewardMessage").innerHTML =
-      "🎉 Tebrikler! Ödül kazandınız! Bir sonraki ziyaretinizde ikinci kahveniz bizden.";
-  } else {
+      "🎁 Tebrikler! 2. kahveniz hediye! Bir sonraki ziyaretinizde kullanabilirsiniz.";
+  }
+  else if(used){
     document.getElementById("rewardMessage").innerHTML =
-      `${level}/4 tamamlandı`;
+      "☕ Hediyenizi kullandınız! Yeni kahve yolculuğunuz başladı.";
+  }
+  else if(earned){
+    document.getElementById("rewardMessage").innerHTML =
+      "🎉 4/4 tamamlandı! Bir sonraki ziyaretinizde ücretsiz kahve kazanacaksınız!";
+  }
+  else{
+    document.getElementById("rewardMessage").innerHTML =
+      progress + "/4 tamamlandı";
   }
 
   setTimeout(()=>{
     window.location.href="about:blank";
-  },4000);
+  },4500);
 }
 
 init();
