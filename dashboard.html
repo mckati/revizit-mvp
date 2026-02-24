@@ -31,39 +31,47 @@
     </div>
   </div>
 
-  <!-- Segment -->
+  <!-- Segment 7 Gün -->
   <h2 class="text-lg font-semibold mb-4">Son 7 Gün Segmentasyonu</h2>
-  <div class="grid grid-cols-3 gap-4 text-center mb-10">
+  <div class="grid grid-cols-3 gap-4 text-center mb-8">
     <div class="bg-green-50 p-4 rounded">
       <p class="text-xs">Yeni (1)</p>
-      <p id="segmentNew" class="text-xl font-bold text-green-600">0</p>
+      <p id="segmentNew7" class="text-xl font-bold text-green-600">0</p>
     </div>
     <div class="bg-yellow-50 p-4 rounded">
       <p class="text-xs">Gelişen (2-4)</p>
-      <p id="segmentGrowing" class="text-xl font-bold text-yellow-600">0</p>
+      <p id="segmentGrow7" class="text-xl font-bold text-yellow-600">0</p>
     </div>
     <div class="bg-blue-50 p-4 rounded">
       <p class="text-xs">Sadık (5+)</p>
-      <p id="segmentLoyal" class="text-xl font-bold text-blue-600">0</p>
+      <p id="segmentLoyal7" class="text-xl font-bold text-blue-600">0</p>
     </div>
   </div>
 
-  <!-- Harcama Bandı -->
-  <h2 class="text-lg font-semibold mb-4">Harcama Bandı Analizi</h2>
-  <div class="grid grid-cols-2 gap-8 mb-10">
-    <div>
-      <h3 class="font-semibold mb-2">Son 7 Gün</h3>
-      <div id="band7"></div>
+  <!-- Segment 30 Gün -->
+  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Segmentasyonu</h2>
+  <div class="grid grid-cols-3 gap-4 text-center mb-10">
+    <div class="bg-green-50 p-4 rounded">
+      <p class="text-xs">Yeni (1)</p>
+      <p id="segmentNew30" class="text-xl font-bold text-green-600">0</p>
     </div>
-    <div>
-      <h3 class="font-semibold mb-2">Son 30 Gün</h3>
-      <div id="band30"></div>
+    <div class="bg-yellow-50 p-4 rounded">
+      <p class="text-xs">Gelişen (2-4)</p>
+      <p id="segmentGrow30" class="text-xl font-bold text-yellow-600">0</p>
+    </div>
+    <div class="bg-blue-50 p-4 rounded">
+      <p class="text-xs">Sadık (5+)</p>
+      <p id="segmentLoyal30" class="text-xl font-bold text-blue-600">0</p>
     </div>
   </div>
 
-  <!-- Trend -->
-  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Ziyaret Trendi</h2>
-  <canvas id="trendChart" height="90"></canvas>
+  <!-- 30 Günlük Trend -->
+  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Günlük Trend</h2>
+  <canvas id="trend30" height="90"></canvas>
+
+  <!-- 7 Gün Saatlik Trend -->
+  <h2 class="text-lg font-semibold mt-12 mb-4">Son 7 Gün Saatlik Dağılım</h2>
+  <canvas id="trend7hour" height="90"></canvas>
 
 </div>
 
@@ -74,12 +82,11 @@ const supabaseClient = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
 );
 
-let businessId = null;
+let businessId;
 
 async function init() {
 
   const { data } = await supabaseClient.auth.getUser();
-
   if (!data.user || data.user.user_metadata.role !== "business") {
     window.location.href = "/login.html";
     return;
@@ -88,152 +95,129 @@ async function init() {
   businessId = data.user.user_metadata.business_id;
 
   await loadKPIs();
-  await loadSegments();
-  await loadBandAnalysis(7, "band7");
-  await loadBandAnalysis(30, "band30");
-  await loadTrend();
+  await loadSegments(7);
+  await loadSegments(30);
+  await loadTrend30();
+  await loadHourlyTrend7();
 }
 
-/* KPI */
 async function loadKPIs() {
 
   let { count: totalCustomers } = await supabaseClient
     .from("customers")
-    .select("*", { count: "exact", head: true })
-    .eq("business_id", businessId);
+    .select("*",{count:"exact",head:true})
+    .eq("business_id",businessId);
 
   let { count: totalVisits } = await supabaseClient
     .from("visits")
-    .select("*", { count: "exact", head: true })
-    .eq("business_id", businessId);
+    .select("*",{count:"exact",head:true})
+    .eq("business_id",businessId);
 
-  let repeatRate = totalCustomers > 0
-    ? Math.max(0, Math.round((totalVisits / totalCustomers - 1) * 100))
+  let repeatRate = totalCustomers>0
+    ? Math.max(0,Math.round((totalVisits/totalCustomers-1)*100))
     : 0;
 
-  document.getElementById("totalCustomers").innerText = totalCustomers || 0;
-  document.getElementById("totalVisits").innerText = totalVisits || 0;
-  document.getElementById("repeatRate").innerText = repeatRate + "%";
+  document.getElementById("totalCustomers").innerText=totalCustomers||0;
+  document.getElementById("totalVisits").innerText=totalVisits||0;
+  document.getElementById("repeatRate").innerText=repeatRate+"%";
 }
 
-/* Segment */
-async function loadSegments() {
+async function loadSegments(days){
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const date=new Date();
+  date.setDate(date.getDate()-days);
 
   const { data: visits } = await supabaseClient
     .from("visits")
     .select("customer_id")
-    .eq("business_id", businessId)
-    .gte("visit_date", sevenDaysAgo.toISOString());
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
 
-  const counts = {};
-  visits.forEach(v => {
-    counts[v.customer_id] = (counts[v.customer_id] || 0) + 1;
+  const counts={};
+  visits.forEach(v=>{
+    counts[v.customer_id]=(counts[v.customer_id]||0)+1;
   });
 
-  let newC=0, growC=0, loyalC=0;
-
-  Object.values(counts).forEach(c => {
-    if (c === 1) newC++;
-    else if (c <= 4) growC++;
-    else loyalC++;
+  let n=0,g=0,l=0;
+  Object.values(counts).forEach(c=>{
+    if(c===1)n++;
+    else if(c<=4)g++;
+    else l++;
   });
 
-  document.getElementById("segmentNew").innerText = newC;
-  document.getElementById("segmentGrowing").innerText = growC;
-  document.getElementById("segmentLoyal").innerText = loyalC;
-}
-
-/* Band */
-async function loadBandAnalysis(days, elementId) {
-
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-
-  const { data: visits } = await supabaseClient
-    .from("visits")
-    .select("spending_band")
-    .eq("business_id", businessId)
-    .gte("visit_date", date.toISOString());
-
-  const bandCounts = {"0-250":0,"251-500":0,"501-1000":0};
-  visits.forEach(v => bandCounts[v.spending_band]++);
-
-  const total = visits.length;
-  let html="";
-
-  for (let band in bandCounts) {
-
-    const percent = total>0 ? Math.round((bandCounts[band]/total)*100) : 0;
-
-    html+=`
-      <div class="mb-2">
-        <div class="flex justify-between text-sm">
-          <span>${band}</span>
-          <span>${percent}%</span>
-        </div>
-        <div class="w-full bg-gray-200 h-2 rounded">
-          <div class="bg-black h-2 rounded" style="width:${percent}%"></div>
-        </div>
-      </div>`;
+  if(days===7){
+    document.getElementById("segmentNew7").innerText=n;
+    document.getElementById("segmentGrow7").innerText=g;
+    document.getElementById("segmentLoyal7").innerText=l;
+  }else{
+    document.getElementById("segmentNew30").innerText=n;
+    document.getElementById("segmentGrow30").innerText=g;
+    document.getElementById("segmentLoyal30").innerText=l;
   }
-
-  document.getElementById(elementId).innerHTML=html;
 }
 
-/* Trend */
-async function loadTrend() {
+async function loadTrend30(){
 
   const today=new Date();
-  const startDate=new Date();
-  startDate.setDate(today.getDate()-30);
+  const start=new Date();
+  start.setDate(today.getDate()-30);
 
   const { data: visits } = await supabaseClient
     .from("visits")
-    .select("customer_id,visit_date")
+    .select("visit_date")
     .eq("business_id",businessId)
-    .gte("visit_date",startDate.toISOString());
+    .gte("visit_date",start.toISOString());
 
   const daily={};
 
   visits.forEach(v=>{
     const d=new Date(v.visit_date).toISOString().split("T")[0];
-    if(!daily[d]) daily[d]={customers:{}};
-    daily[d].customers[v.customer_id]=(daily[d].customers[v.customer_id]||0)+1;
+    daily[d]=(daily[d]||0)+1;
   });
 
-  const labels=[], newArr=[], repeatArr=[];
+  const labels=[],values=[];
 
   for(let i=30;i>=0;i--){
     const d=new Date();
     d.setDate(today.getDate()-i);
     const key=d.toISOString().split("T")[0];
     labels.push(key.slice(5));
-
-    if(daily[key]){
-      let n=0,r=0;
-      for(let c in daily[key].customers){
-        if(daily[key].customers[c]===1) n++;
-        else r++;
-      }
-      newArr.push(n);
-      repeatArr.push(r);
-    } else {
-      newArr.push(0);
-      repeatArr.push(0);
-    }
+    values.push(daily[key]||0);
   }
 
-  new Chart(document.getElementById('trendChart'),{
-    type:'line',
+  new Chart(document.getElementById("trend30"),{
+    type:"line",
     data:{
       labels:labels,
-      datasets:[
-        {label:'Yeni Müşteri',data:newArr,borderColor:'green'},
-        {label:'Tekrar Ziyaret',data:repeatArr,borderColor:'blue'}
-      ]
+      datasets:[{label:"Toplam Ziyaret",data:values,borderColor:"black"}]
+    },
+    options:{responsive:true}
+  });
+}
+
+async function loadHourlyTrend7(){
+
+  const date=new Date();
+  date.setDate(date.getDate()-7);
+
+  const { data: visits } = await supabaseClient
+    .from("visits")
+    .select("visit_date")
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
+
+  const hours=Array(24).fill(0);
+
+  visits.forEach(v=>{
+    const h=new Date(v.visit_date).getHours();
+    hours[h]++;
+  });
+
+  new Chart(document.getElementById("trend7hour"),{
+    type:"bar",
+    data:{
+      labels:Array.from({length:24},(_,i)=>i+":00"),
+      datasets:[{label:"Ziyaret Sayısı",data:hours,backgroundColor:"black"}]
     },
     options:{responsive:true}
   });
