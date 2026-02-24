@@ -93,7 +93,6 @@ async function init() {
 
   tokenData = data;
 
-  // Eğer localStorage'da bu işletme için telefon kayıtlıysa
   const savedPhone =
     localStorage.getItem("revizit_phone_" + data.business_id);
 
@@ -142,6 +141,32 @@ async function completeVisit(phoneOverride = null, silent = false) {
     customerId = customer.id;
   }
 
+  // 🔥 GÜNLÜK LİMİT KONTROLÜ
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+
+  const todayEnd = new Date();
+  todayEnd.setHours(23,59,59,999);
+
+  const { data: todayVisits } = await supabaseClient
+    .from("visits")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("customer_id", customerId)
+    .gte("visit_date", todayStart.toISOString())
+    .lte("visit_date", todayEnd.toISOString());
+
+  if (todayVisits.length > 0) {
+
+    await supabaseClient
+      .from("qr_tokens")
+      .delete()
+      .eq("token", tokenValue);
+
+    showError("Bugün zaten ziyaret kaydınız var.");
+    return;
+  }
+
   // ziyaret ekle
   const { error } = await supabaseClient
     .from("visits")
@@ -156,20 +181,18 @@ async function completeVisit(phoneOverride = null, silent = false) {
     return;
   }
 
-  // token sil (çift kullanım engeli)
+  // token sil
   await supabaseClient
     .from("qr_tokens")
     .delete()
     .eq("token", tokenValue);
 
-  // telefonu localStorage'a kaydet
   localStorage.setItem(
     "revizit_phone_" + businessId,
     phone
   );
 
-  if (!silent) showSuccess();
-  else showSuccess();
+  showSuccess();
 }
 
 init();
