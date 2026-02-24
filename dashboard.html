@@ -15,6 +15,7 @@
     <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
   </div>
 
+  <!-- KPI -->
   <h2 class="text-lg font-semibold mb-4">Son 30 Gün Performansı</h2>
 
   <div class="grid grid-cols-3 gap-4 mb-3 text-center">
@@ -45,8 +46,58 @@
     <span id="allVisits">0</span> ziyaret
   </p>
 
+  <!-- SEGMENT -->
+  <h2 class="text-lg font-semibold mb-4">Son 7 Gün Segmentasyonu</h2>
+  <div class="grid grid-cols-3 gap-4 text-center mb-8">
+    <div class="bg-green-50 p-4 rounded">
+      <p class="text-xs">Yeni</p>
+      <p id="segmentNew7" class="text-xl font-bold text-green-600">0</p>
+    </div>
+    <div class="bg-yellow-50 p-4 rounded">
+      <p class="text-xs">Gelişen</p>
+      <p id="segmentGrow7" class="text-xl font-bold text-yellow-600">0</p>
+    </div>
+    <div class="bg-blue-50 p-4 rounded">
+      <p class="text-xs">Sadık</p>
+      <p id="segmentLoyal7" class="text-xl font-bold text-blue-600">0</p>
+    </div>
+  </div>
+
+  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Segmentasyonu</h2>
+  <div class="grid grid-cols-3 gap-4 text-center mb-10">
+    <div class="bg-green-50 p-4 rounded">
+      <p class="text-xs">Yeni</p>
+      <p id="segmentNew30" class="text-xl font-bold text-green-600">0</p>
+    </div>
+    <div class="bg-yellow-50 p-4 rounded">
+      <p class="text-xs">Gelişen</p>
+      <p id="segmentGrow30" class="text-xl font-bold text-yellow-600">0</p>
+    </div>
+    <div class="bg-blue-50 p-4 rounded">
+      <p class="text-xs">Sadık</p>
+      <p id="segmentLoyal30" class="text-xl font-bold text-blue-600">0</p>
+    </div>
+  </div>
+
+  <!-- BAND -->
+  <h2 class="text-lg font-semibold mb-4">Harcama Bandı Analizi</h2>
+  <div class="grid grid-cols-2 gap-8 mb-10">
+    <div>
+      <h3 class="font-semibold mb-2">Son 7 Gün</h3>
+      <div id="band7"></div>
+    </div>
+    <div>
+      <h3 class="font-semibold mb-2">Son 30 Gün</h3>
+      <div id="band30"></div>
+    </div>
+  </div>
+
+  <!-- TREND -->
   <h2 class="text-lg font-semibold mb-4">Son 30 Gün Günlük Trend</h2>
   <canvas id="trend30" height="90"></canvas>
+
+  <h2 class="text-lg font-semibold mt-12 mb-4">Son 7 Gün Saatlik Yoğunluk</h2>
+  <canvas id="trend7hour" height="90"></canvas>
 
 </div>
 
@@ -71,84 +122,58 @@ async function init(){
   businessId=data.user.user_metadata.business_id;
 
   await loadKPIs();
+  await loadSegments(7);
+  await loadSegments(30);
+  await loadBand(7,"band7");
+  await loadBand(30,"band30");
   await loadTrend30();
+  await loadHourly7();
 }
 
-function calculateChange(current, previous){
-  if(previous === 0){
-    return current > 0 ? 100 : 0;
-  }
-  return Math.round(((current - previous) / previous) * 100);
+function calcChange(current,previous){
+  if(previous===0) return current>0?100:0;
+  return Math.round(((current-previous)/previous)*100);
 }
 
-function formatChange(percent){
-  if(percent > 0)
-    return `<span class="text-green-600">↑ ${percent}%</span>`;
-  if(percent < 0)
-    return `<span class="text-red-600">↓ ${Math.abs(percent)}%</span>`;
+function formatChange(p){
+  if(p>0) return `<span class="text-green-600">↑ ${p}%</span>`;
+  if(p<0) return `<span class="text-red-600">↓ ${Math.abs(p)}%</span>`;
   return `<span class="text-gray-500">→ 0%</span>`;
 }
 
 async function loadKPIs(){
 
   const now=new Date();
+  const startCurrent=new Date(); startCurrent.setDate(now.getDate()-30);
+  const startPrevious=new Date(); startPrevious.setDate(now.getDate()-60);
 
-  const startCurrent=new Date();
-  startCurrent.setDate(now.getDate()-30);
-
-  const startPrevious=new Date();
-  startPrevious.setDate(now.getDate()-60);
-
-  const { data: currentVisits } = await supabaseClient
+  const { data: current } = await supabaseClient
     .from("visits")
     .select("customer_id")
     .eq("business_id",businessId)
     .gte("visit_date",startCurrent.toISOString());
 
-  const { data: previousVisits } = await supabaseClient
+  const { data: previous } = await supabaseClient
     .from("visits")
     .select("customer_id")
     .eq("business_id",businessId)
     .gte("visit_date",startPrevious.toISOString())
     .lt("visit_date",startCurrent.toISOString());
 
-  // CURRENT
-  const currentCustomersSet=new Set();
-  currentVisits.forEach(v=>currentCustomersSet.add(v.customer_id));
+  const curSet=new Set(current.map(v=>v.customer_id));
+  const prevSet=new Set(previous.map(v=>v.customer_id));
 
-  const currentCustomers=currentCustomersSet.size;
-  const currentVisitsCount=currentVisits.length;
+  const curRepeat=curSet.size>0?Math.round((current.length/curSet.size-1)*100):0;
+  const prevRepeat=prevSet.size>0?Math.round((previous.length/prevSet.size-1)*100):0;
 
-  const currentRepeat=currentCustomers>0
-    ? Math.max(0,Math.round((currentVisitsCount/currentCustomers-1)*100))
-    : 0;
+  document.getElementById("customers30").innerText=curSet.size;
+  document.getElementById("visits30").innerText=current.length;
+  document.getElementById("repeat30").innerText=curRepeat+"%";
 
-  // PREVIOUS
-  const previousCustomersSet=new Set();
-  previousVisits.forEach(v=>previousCustomersSet.add(v.customer_id));
+  document.getElementById("customersChange").innerHTML=formatChange(calcChange(curSet.size,prevSet.size));
+  document.getElementById("visitsChange").innerHTML=formatChange(calcChange(current.length,previous.length));
+  document.getElementById("repeatChange").innerHTML=formatChange(calcChange(curRepeat,prevRepeat));
 
-  const previousCustomers=previousCustomersSet.size;
-  const previousVisitsCount=previousVisits.length;
-
-  const previousRepeat=previousCustomers>0
-    ? Math.max(0,Math.round((previousVisitsCount/previousCustomers-1)*100))
-    : 0;
-
-  // SET VALUES
-  document.getElementById("customers30").innerText=currentCustomers;
-  document.getElementById("visits30").innerText=currentVisitsCount;
-  document.getElementById("repeat30").innerText=currentRepeat+"%";
-
-  document.getElementById("customersChange").innerHTML=
-    formatChange(calculateChange(currentCustomers,previousCustomers));
-
-  document.getElementById("visitsChange").innerHTML=
-    formatChange(calculateChange(currentVisitsCount,previousVisitsCount));
-
-  document.getElementById("repeatChange").innerHTML=
-    formatChange(calculateChange(currentRepeat,previousRepeat));
-
-  // All time
   let { count: allCustomers } = await supabaseClient
     .from("customers")
     .select("*",{count:"exact",head:true})
@@ -163,41 +188,120 @@ async function loadKPIs(){
   document.getElementById("allVisits").innerText=allVisits||0;
 }
 
+async function loadSegments(days){
+
+  const date=new Date(); date.setDate(date.getDate()-days);
+
+  const { data } = await supabaseClient
+    .from("visits")
+    .select("customer_id")
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
+
+  const counts={};
+  data.forEach(v=>counts[v.customer_id]=(counts[v.customer_id]||0)+1);
+
+  let n=0,g=0,l=0;
+  Object.values(counts).forEach(c=>{
+    if(c===1)n++;
+    else if(c<=4)g++;
+    else l++;
+  });
+
+  if(days===7){
+    segmentNew7.innerText=n;
+    segmentGrow7.innerText=g;
+    segmentLoyal7.innerText=l;
+  }else{
+    segmentNew30.innerText=n;
+    segmentGrow30.innerText=g;
+    segmentLoyal30.innerText=l;
+  }
+}
+
+async function loadBand(days,id){
+
+  const date=new Date(); date.setDate(date.getDate()-days);
+
+  const { data } = await supabaseClient
+    .from("visits")
+    .select("spending_band")
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
+
+  const bands={"0-250":0,"251-500":0,"501-1000":0};
+  data.forEach(v=>bands[v.spending_band]++);
+
+  const total=data.length;
+  let html="";
+
+  for(let b in bands){
+    const p=total>0?Math.round((bands[b]/total)*100):0;
+    html+=`
+      <div class="mb-2">
+        <div class="flex justify-between text-sm">
+          <span>${b}</span><span>${p}%</span>
+        </div>
+        <div class="w-full bg-gray-200 h-2 rounded">
+          <div class="bg-black h-2 rounded" style="width:${p}%"></div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById(id).innerHTML=html;
+}
+
 async function loadTrend30(){
 
   const today=new Date();
-  const start=new Date();
-  start.setDate(today.getDate()-30);
+  const start=new Date(); start.setDate(today.getDate()-30);
 
-  const { data: visits } = await supabaseClient
+  const { data } = await supabaseClient
     .from("visits")
     .select("visit_date")
     .eq("business_id",businessId)
     .gte("visit_date",start.toISOString());
 
   const daily={};
-  visits.forEach(v=>{
+  data.forEach(v=>{
     const d=new Date(v.visit_date).toISOString().split("T")[0];
     daily[d]=(daily[d]||0)+1;
   });
 
   const labels=[],values=[];
   for(let i=30;i>=0;i--){
-    const d=new Date();
-    d.setDate(today.getDate()-i);
+    const d=new Date(); d.setDate(today.getDate()-i);
     const key=d.toISOString().split("T")[0];
     labels.push(key.slice(5));
     values.push(daily[key]||0);
   }
 
-  new Chart(document.getElementById("trend30"),{
-    type:"line",
-    data:{
-      labels:labels,
-      datasets:[{label:"Toplam Ziyaret",data:values,borderColor:"black"}]
-    },
-    options:{responsive:true}
+  new Chart(trend30,{type:"line",
+    data:{labels:labels,
+    datasets:[{label:"Toplam Ziyaret",data:values,borderColor:"black"}]},
+    options:{responsive:true}});
+}
+
+async function loadHourly7(){
+
+  const date=new Date(); date.setDate(date.getDate()-7);
+
+  const { data } = await supabaseClient
+    .from("visits")
+    .select("visit_date")
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
+
+  const hours=Array(24).fill(0);
+  data.forEach(v=>{
+    const h=new Date(v.visit_date).getHours();
+    hours[h]++;
   });
+
+  new Chart(trend7hour,{type:"bar",
+    data:{labels:Array.from({length:24},(_,i)=>i+":00"),
+    datasets:[{label:"Ziyaret",data:hours,backgroundColor:"black"}]},
+    options:{responsive:true}});
 }
 
 async function logout(){
@@ -208,6 +312,5 @@ async function logout(){
 init();
 
 </script>
-
 </body>
 </html>
