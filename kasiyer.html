@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit - Kasiyer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+<div class="bg-white p-8 rounded-xl shadow w-96 text-center">
+
+  <h1 class="text-xl font-bold mb-6">Ziyaret Başlat</h1>
+
+  <div id="bandSelection">
+    <p class="mb-4 text-sm text-gray-600">Harcama Bandı Seç</p>
+
+    <button onclick="startVisit('0-250')" class="w-full mb-2 bg-gray-200 p-2 rounded">
+      0 - 250
+    </button>
+
+    <button onclick="startVisit('251-500')" class="w-full mb-2 bg-gray-200 p-2 rounded">
+      251 - 500
+    </button>
+
+    <button onclick="startVisit('501-1000')" class="w-full bg-gray-200 p-2 rounded">
+      501 - 1000
+    </button>
+  </div>
+
+  <div id="qrArea" class="hidden">
+    <canvas id="qrcode"></canvas>
+    <p class="mt-4 text-sm text-red-500">
+      15 saniye geçerli
+    </p>
+  </div>
+
+</div>
+
+<script>
+
+const supabaseClient = supabase.createClient(
+  'https://hyqlhnraoumjsxaxefez.supabase.co',
+  'ANON_KEY'
+);
+
+const businessId = 'c95e305c-adde-4dd5-8cc9-40f8c51bbc74';
+
+async function startVisit(band) {
+
+  const expiresAt = new Date(Date.now() + 15000).toISOString();
+
+  // Token oluştur
+  const { data: tokenData } = await supabaseClient
+    .from("visit_tokens")
+    .insert({
+      business_id: businessId,
+      spending_band: band,
+      expires_at: expiresAt
+    })
+    .select()
+    .single();
+
+  const tokenId = tokenData.id;
+
+  const qrUrl = window.location.origin + "/scan.html?token=" + tokenId;
+
+  document.getElementById("bandSelection").classList.add("hidden");
+  document.getElementById("qrArea").classList.remove("hidden");
+
+  QRCode.toCanvas(document.getElementById('qrcode'), qrUrl);
+
+  // 15 saniye sonra QR sil
+  setTimeout(() => {
+    document.getElementById("qrArea").classList.add("hidden");
+    document.getElementById("bandSelection").classList.remove("hidden");
+    document.getElementById("qrcode").getContext("2d").clearRect(0,0,300,300);
+  }, 15000);
+}
+
+</script>
+
+</body>
+</html>
