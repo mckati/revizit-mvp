@@ -41,16 +41,20 @@
     </div>
   </div>
 
+  <p id="debug" class="text-red-500 text-xs"></p>
+
 </div>
 
 <script>
 
-const supabaseClient = supabase.createClient(
-  "SUPABASE_URL",
-  "ANON_KEY"
-);
+const SUPABASE_URL = "SUPABASE_URL";
+const SUPABASE_ANON = "ANON_KEY";
+const BUSINESS_ID = "BUSINESS_ID";
 
-const businessId = "BUSINESS_ID"; // kendi business id'n
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON
+);
 
 let countdownInterval;
 
@@ -61,24 +65,39 @@ function showBands(){
 
 async function createQR(band){
 
-  document.getElementById("bandArea").classList.add("hidden");
-  document.getElementById("qrArea").classList.remove("hidden");
+  document.getElementById("debug").innerText = "";
 
-  const token = crypto.randomUUID();
+  try {
 
-  await supabaseClient
-    .from("qr_tokens")
-    .insert({
-      token: token,
-      business_id: businessId,
-      spending_band: band,
-      expires_at: new Date(Date.now() + 15000)
-    });
+    const token = crypto.randomUUID();
 
-  document.getElementById("qrCode").innerHTML =
-    `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${token}" />`;
+    const { error } = await supabaseClient
+      .from("qr_tokens")
+      .insert({
+        token: token,
+        business_id: BUSINESS_ID,
+        spending_band: band,
+        expires_at: new Date(Date.now() + 15000)
+      });
 
-  startCountdown();
+    if (error) {
+      document.getElementById("debug").innerText =
+        "DB Hatası: " + error.message;
+      return;
+    }
+
+    document.getElementById("bandArea").classList.add("hidden");
+    document.getElementById("qrArea").classList.remove("hidden");
+
+    document.getElementById("qrCode").innerHTML =
+      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${token}" />`;
+
+    startCountdown();
+
+  } catch (err) {
+    document.getElementById("debug").innerText =
+      "Genel Hata: " + err.message;
+  }
 }
 
 function startCountdown(){
