@@ -1,4 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit MVP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 p-10">
+
+  <div class="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow">
+
+    <h1 class="text-2xl font-bold mb-6">Revizit - Pilot Kafe</h1>
+
+    <!-- DASHBOARD -->
+    <div class="grid grid-cols-3 gap-4 mb-6 text-center">
+      <div class="bg-gray-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Toplam Müşteri</p>
+        <p id="totalCustomers" class="text-xl font-bold">0</p>
+      </div>
+      <div class="bg-gray-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Toplam Ziyaret</p>
+        <p id="totalVisits" class="text-xl font-bold">0</p>
+      </div>
+      <div class="bg-gray-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Tekrar Oranı</p>
+        <p id="repeatRate" class="text-xl font-bold">0%</p>
+      </div>
+    </div>
+
+    <!-- ZİYARET EKLEME -->
+    <input id="phone"
+      placeholder="Müşteri Telefonu"
+      class="border p-2 w-full rounded mb-4"/>
+
+    <button onclick="addVisit()"
+      class="bg-black text-white px-4 py-2 rounded w-full">
+      Ziyaret Ekle
+    </button>
+
+    <div class="mt-6">
+      <p id="result" class="text-sm text-gray-600"></p>
+    </div>
+
+  </div>
+
 <script>
+
   const supabaseClient = supabase.createClient(
     'https://hyqlhnraoumjsxaxefez.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
@@ -6,11 +52,38 @@
 
   const businessId = 'c95e305c-adde-4dd5-8cc9-40f8c51bbc74';
 
-  async function addVisit() {
-    const phone = document.getElementById("phone").value;
+  async function loadDashboard() {
 
+    // Toplam müşteri
+    let { count: totalCustomers } = await supabaseClient
+      .from("customers")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", businessId);
+
+    // Toplam ziyaret
+    let { count: totalVisits } = await supabaseClient
+      .from("visits")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", businessId);
+
+    // Tekrar oranı
+    let repeatRate = 0;
+    if (totalCustomers > 0) {
+      repeatRate = Math.round((totalVisits / totalCustomers - 1) * 100);
+      if (repeatRate < 0) repeatRate = 0;
+    }
+
+    document.getElementById("totalCustomers").innerText = totalCustomers || 0;
+    document.getElementById("totalVisits").innerText = totalVisits || 0;
+    document.getElementById("repeatRate").innerText = repeatRate + "%";
+  }
+
+  async function addVisit() {
+
+    const phone = document.getElementById("phone").value;
     if (!phone) return;
 
+    // müşteri var mı kontrol
     let { data: existingCustomer } = await supabaseClient
       .from("customers")
       .select("*")
@@ -21,6 +94,7 @@
     let customerId;
 
     if (!existingCustomer) {
+
       let { data: newCustomer } = await supabaseClient
         .from("customers")
         .insert({
@@ -31,10 +105,12 @@
         .single();
 
       customerId = newCustomer.id;
+
     } else {
       customerId = existingCustomer.id;
     }
 
+    // ziyaret ekle
     await supabaseClient
       .from("visits")
       .insert({
@@ -42,15 +118,15 @@
         customer_id: customerId
       });
 
-    // 🔥 TOPLAM ZİYARETİ HESAPLA
-    let { data: visitCount } = await supabaseClient
-      .from("visits")
-      .select("*", { count: "exact" })
-      .eq("customer_id", customerId);
-
-    document.getElementById("result").innerText =
-      "Toplam ziyaret: " + visitCount.length;
-
     document.getElementById("phone").value = "";
+    document.getElementById("result").innerText = "Ziyaret kaydedildi.";
+    loadDashboard();
   }
+
+  // Sayfa açılınca dashboard yükle
+  loadDashboard();
+
 </script>
+
+</body>
+</html>
