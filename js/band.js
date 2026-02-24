@@ -12,7 +12,8 @@ async function loadBand(businessId, days, elementId) {
   const bands = {
     "0-250": 0,
     "251-500": 0,
-    "501-1000": 0
+    "501-1000": 0,
+    "1001+": 0
   };
 
   data.forEach(v => {
