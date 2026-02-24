@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit - Ziyaret</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+<div class="bg-white p-8 rounded-xl shadow w-96 text-center">
+
+  <h1 class="text-xl font-bold mb-6">Ziyaret Onayı</h1>
+
+  <div id="loadingArea">
+    <p class="text-gray-600">Kontrol ediliyor...</p>
+  </div>
+
+  <div id="phoneArea" class="hidden">
+    <p class="mb-4 text-sm text-gray-600">Telefon Numaranızı Girin</p>
+    <input id="phoneInput"
+           class="border p-2 w-full rounded mb-4"
+           placeholder="05XXXXXXXXX">
+    <button onclick="completeVisit()"
+            class="w-full bg-black text-white p-2 rounded">
+      Ziyareti Tamamla
+    </button>
+  </div>
+
+  <div id="successArea" class="hidden">
+    <p class="text-green-600 font-semibold">Ziyaret Kaydedildi ✅</p>
+  </div>
+
+  <div id="errorArea" class="hidden">
+    <p class="text-red-600 font-semibold" id="errorText"></p>
+  </div>
+
+</div>
+
+<script>
+
+const supabaseClient = supabase.createClient(
+  'https://hyqlhnraoumjsxaxefez.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
+);
+
+const businessId = 'c95e305c-adde-4dd5-8cc9-40f8c51bbc74';
+
+let currentToken = null;
+let currentBand = null;
+
+async function init() {
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token");
+
+  if (!token) {
+    showError("Geçersiz QR");
+    return;
+  }
+
+  const { data: tokenData, error } = await supabaseClient
+    .from("visit_tokens")
+    .select("*")
+    .eq("id", token)
+    .single();
+
+  if (error || !tokenData) {
+    showError("Token bulunamadı");
+    return;
+  }
+
+  if (tokenData.used) {
+    showError("Bu QR zaten kullanılmış");
+    return;
+  }
+
+  if (new Date(tokenData.expires_at) < new Date()) {
+    showError("QR süresi dolmuş");
+    return;
+  }
+
+  currentToken = tokenData.id;
+  currentBand = tokenData.spending_band;
+
+  document.getElementById("loadingArea").classList.add("hidden");
+  document.getElementById("phoneArea").classList.remove("hidden");
+}
+
+async function completeVisit() {
+
+  const phone = document.getElementById("phoneInput").value;
+
+  if (!phone) return;
+
+  // müşteri var mı
+  let { data: existingCustomer } = await supabaseClient
+    .from("customers")
+    .select("*")
+    .eq("phone", phone)
+    .eq("business_id", businessId)
+    .single();
+
+  let customerId;
+
+  if (!existingCustomer) {
+
+    let { data: newCustomer } = await supabaseClient
+      .from("customers")
+      .insert({
+        phone: phone,
+        business_id: businessId
+      })
+      .select()
+      .single();
+
+    customerId = newCustomer.id;
+
+  } else {
+    customerId = existingCustomer.id;
+  }
+
+  // ziyaret ekle
+  await supabaseClient
+    .from("visits")
+    .insert({
+      business_id: businessId,
+      customer_id: customerId,
+      spending_band: currentBand
+    });
+
+  // token used yap
+  await supabaseClient
+    .from("visit_tokens")
+    .update({ used: true })
+    .eq("id", currentToken);
+
+  document.getElementById("phoneArea").classList.add("hidden");
+  document.getElementById("successArea").classList.remove("hidden");
+}
+
+function showError(message) {
+  document.getElementById("loadingArea").classList.add("hidden");
+  document.getElementById("errorArea").classList.remove("hidden");
+  document.getElementById("errorText").innerText = message;
+}
+
+init();
+
+</script>
+
+</body>
+</html>
