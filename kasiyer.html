@@ -12,7 +12,6 @@
 
   <h1 class="text-xl font-bold mb-6">Kasiyer Paneli</h1>
 
-  <!-- Ziyaret Başlat -->
   <div id="startArea">
     <button onclick="showBands()" 
       class="w-full bg-black text-white p-3 rounded">
@@ -20,7 +19,6 @@
     </button>
   </div>
 
-  <!-- Harcama Bantları -->
   <div id="bandArea" class="hidden mt-4">
     <p class="mb-4 text-sm text-gray-600">Harcama Bandı Seç</p>
 
@@ -37,7 +35,6 @@
     </button>
   </div>
 
-  <!-- QR Alanı -->
   <div id="qrArea" class="hidden mt-6">
 
     <canvas id="qrcode" class="mx-auto"></canvas>
@@ -67,6 +64,8 @@ const supabaseClient = supabase.createClient(
 const businessId = 'c95e305c-adde-4dd5-8cc9-40f8c51bbc74';
 
 let countdownInterval;
+let tokenCheckInterval;
+let currentTokenId = null;
 
 function showBands() {
   document.getElementById("startArea").classList.add("hidden");
@@ -93,8 +92,9 @@ async function startVisit(band) {
     return;
   }
 
-  const tokenId = tokenData.id;
-  const qrUrl = window.location.origin + "/scan.html?token=" + tokenId;
+  currentTokenId = tokenData.id;
+
+  const qrUrl = window.location.origin + "/scan.html?token=" + currentTokenId;
 
   document.getElementById("bandArea").classList.add("hidden");
   document.getElementById("qrArea").classList.remove("hidden");
@@ -102,6 +102,7 @@ async function startVisit(band) {
   QRCode.toCanvas(document.getElementById('qrcode'), qrUrl);
 
   startCountdown(15);
+  startTokenWatcher();
 }
 
 function startCountdown(seconds) {
@@ -123,7 +124,25 @@ function startCountdown(seconds) {
     progressBar.style.width = percentage + "%";
 
     if (timeLeft <= 0) {
-      clearInterval(countdownInterval);
+      resetScreen();
+    }
+
+  }, 1000);
+}
+
+function startTokenWatcher() {
+
+  tokenCheckInterval = setInterval(async () => {
+
+    if (!currentTokenId) return;
+
+    const { data } = await supabaseClient
+      .from("visit_tokens")
+      .select("used")
+      .eq("id", currentTokenId)
+      .single();
+
+    if (data && data.used === true) {
       resetScreen();
     }
 
@@ -133,6 +152,7 @@ function startCountdown(seconds) {
 function resetScreen() {
 
   clearInterval(countdownInterval);
+  clearInterval(tokenCheckInterval);
 
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("bandArea").classList.add("hidden");
@@ -144,6 +164,8 @@ function resetScreen() {
 
   document.getElementById("progressBar").style.width = "100%";
   document.getElementById("countdownText").innerText = "15";
+
+  currentTokenId = null;
 }
 
 </script>
