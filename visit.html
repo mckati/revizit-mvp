@@ -16,8 +16,10 @@
 
   <div id="phoneArea" class="hidden space-y-3">
     <input id="phone"
-      placeholder="Telefon Numaranız"
-      class="border p-2 w-full rounded"/>
+      placeholder="05XX XXX XXXX"
+      maxlength="13"
+      inputmode="numeric"
+      class="border p-2 w-full rounded text-center text-lg tracking-wider"/>
     <button onclick="completeVisit()"
       class="bg-black text-white px-4 py-2 rounded w-full">
       Onayla
@@ -39,6 +41,48 @@ const supabaseClient = supabase.createClient(
 let tokenData = null;
 let tokenValue = null;
 
+/* ========================
+   TELEFON FORMAT SİSTEMİ
+======================== */
+
+const phoneInput = document.getElementById("phone");
+
+phoneInput?.addEventListener("input", function(e) {
+
+  let digits = e.target.value.replace(/\D/g, "");
+
+  if (digits.length > 11) {
+    digits = digits.slice(0, 11);
+  }
+
+  // Format: 05XX XXX XXXX
+  let formatted = "";
+
+  if (digits.length > 0) {
+    formatted += digits.substring(0, 4);
+  }
+  if (digits.length >= 5) {
+    formatted += " " + digits.substring(4, 7);
+  }
+  if (digits.length >= 8) {
+    formatted += " " + digits.substring(7, 11);
+  }
+
+  e.target.value = formatted;
+});
+
+function cleanPhoneNumber(formattedPhone) {
+  return formattedPhone.replace(/\D/g, "");
+}
+
+function isValidPhone(phone) {
+  return /^05\d{9}$/.test(phone);
+}
+
+/* ========================
+   GENEL AKIŞ
+======================== */
+
 function getTokenFromURL() {
   const params = new URLSearchParams(window.location.search);
   return params.get("token");
@@ -46,7 +90,7 @@ function getTokenFromURL() {
 
 function showError(message) {
   document.getElementById("status").innerHTML =
-    `<p class="text-red-500">${message}</p>`;
+    `<p class="text-red-500 text-sm">${message}</p>`;
   document.getElementById("phoneArea").classList.add("hidden");
 }
 
@@ -105,18 +149,19 @@ async function init() {
 
 async function completeVisit(phoneOverride = null, silent = false) {
 
-  const phone =
-    phoneOverride || document.getElementById("phone").value;
+  let phone =
+    phoneOverride || document.getElementById("phone").value.trim();
 
-  if (!phone) {
-    showError("Telefon numarası gerekli.");
+  phone = cleanPhoneNumber(phone);
+
+  if (!isValidPhone(phone)) {
+    showError("Lütfen 05XX XXX XXXX formatında geçerli bir telefon numarası girin.");
     return;
   }
 
   const businessId = tokenData.business_id;
   const band = tokenData.spending_band;
 
-  // müşteri var mı?
   let { data: customer } = await supabaseClient
     .from("customers")
     .select("*")
@@ -141,7 +186,7 @@ async function completeVisit(phoneOverride = null, silent = false) {
     customerId = customer.id;
   }
 
-  // 🔥 GÜNLÜK LİMİT KONTROLÜ
+  // Günlük limit kontrolü
   const todayStart = new Date();
   todayStart.setHours(0,0,0,0);
 
@@ -163,11 +208,10 @@ async function completeVisit(phoneOverride = null, silent = false) {
       .delete()
       .eq("token", tokenValue);
 
-    showError("Bugün zaten ziyaret kaydınız var.");
+    showError("Bugün zaten ziyaret kaydınız bulunmaktadır. Günlük ziyaret kaydı limiti 1 ile sınırlıdır. Anlayışınız için teşekkür ederiz.");
     return;
   }
 
-  // ziyaret ekle
   const { error } = await supabaseClient
     .from("visits")
     .insert({
@@ -181,7 +225,6 @@ async function completeVisit(phoneOverride = null, silent = false) {
     return;
   }
 
-  // token sil
   await supabaseClient
     .from("qr_tokens")
     .delete()
