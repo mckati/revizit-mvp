@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+<div class="bg-white p-8 rounded-xl shadow w-96">
+
+  <h1 class="text-xl font-bold mb-6 text-center">Revizit Giriş</h1>
+
+  <input id="email"
+         type="email"
+         placeholder="Email"
+         class="border p-2 w-full rounded mb-4">
+
+  <input id="password"
+         type="password"
+         placeholder="Şifre"
+         class="border p-2 w-full rounded mb-4">
+
+  <button onclick="login()"
+          class="w-full bg-black text-white p-2 rounded">
+    Giriş Yap
+  </button>
+
+  <p id="error" class="text-red-500 text-sm mt-4 text-center hidden"></p>
+
+</div>
+
+<script>
+
+const supabaseClient = supabase.createClient(
+  'https://hyqlhnraoumjsxaxefez.supabase.co',
+  'ANON_KEY'
+);
+
+async function login() {
+
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    document.getElementById("error").innerText = "Giriş başarısız";
+    document.getElementById("error").classList.remove("hidden");
+    return;
+  }
+
+  const role = data.user.user_metadata.role;
+
+  if (role === "admin") {
+    window.location.href = "/admin.html";
+  } else {
+    window.location.href = "/dashboard.html";
+  }
+}
+
+</script>
+
+</body>
+</html>
