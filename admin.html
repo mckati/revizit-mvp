@@ -13,8 +13,8 @@
   <script src="/js/band.js"></script>
   <script src="/js/trend.js"></script>
   <script src="/js/businessView.js"></script>
-
 </head>
+
 <body class="bg-gray-100 p-10">
 
 <div class="max-w-6xl mx-auto space-y-6">
@@ -49,19 +49,32 @@
     card.className = "bg-white p-6 rounded-xl shadow";
 
     card.innerHTML = `
-      <div class="flex justify-between items-center cursor-pointer"
+      <div class="cursor-pointer"
            onclick="toggleDetails('${b.id}')">
 
-        <div>
+        <div class="flex justify-between items-center mb-3">
           <h2 class="text-lg font-semibold">${b.name}</h2>
-          <div class="flex space-x-6 text-sm text-gray-600 mt-1">
-            <span id="${prefix}customers30">0</span>
-            <span id="${prefix}visits30">0</span>
-            <span id="${prefix}repeat30">0%</span>
-          </div>
+          <span class="text-sm text-gray-500">Detay ▼</span>
         </div>
 
-        <span class="text-sm text-gray-500">Detay ▼</span>
+        <div class="grid grid-cols-3 gap-4 text-center">
+
+          <div class="bg-gray-50 p-3 rounded">
+            <p class="text-xs text-gray-500">Aktif Müşteri (30g)</p>
+            <p id="${prefix}customers30" class="text-lg font-bold">0</p>
+          </div>
+
+          <div class="bg-gray-50 p-3 rounded">
+            <p class="text-xs text-gray-500">Ziyaret (30g)</p>
+            <p id="${prefix}visits30" class="text-lg font-bold">0</p>
+          </div>
+
+          <div class="bg-gray-50 p-3 rounded">
+            <p class="text-xs text-gray-500">Tekrar Oranı (30g)</p>
+            <p id="${prefix}repeat30" class="text-lg font-bold">0%</p>
+          </div>
+
+        </div>
 
       </div>
 
