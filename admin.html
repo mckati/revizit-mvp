@@ -7,7 +7,7 @@
 </head>
 <body class="bg-gray-100 p-10">
 
-<div class="max-w-5xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-6xl mx-auto bg-white p-8 rounded-xl shadow">
 
   <div class="flex justify-between items-center mb-8">
     <h1 class="text-2xl font-bold">Admin Paneli</h1>
@@ -29,12 +29,7 @@ async function init() {
 
   const { data } = await supabaseClient.auth.getUser();
 
-  if (!data.user) {
-    window.location.href = "/login.html";
-    return;
-  }
-
-  if (data.user.user_metadata.role !== "admin") {
+  if (!data.user || data.user.user_metadata.role !== "admin") {
     window.location.href = "/login.html";
     return;
   }
@@ -52,6 +47,7 @@ async function loadBusinesses() {
 
   for (let b of businesses) {
 
+    // Genel KPI
     const { count: totalCustomers } = await supabaseClient
       .from("customers")
       .select("*", { count: "exact", head: true })
@@ -62,11 +58,75 @@ async function loadBusinesses() {
       .select("*", { count: "exact", head: true })
       .eq("business_id", b.id);
 
+    let repeatRate = 0;
+    if (totalCustomers > 0) {
+      repeatRate = Math.round((totalVisits / totalCustomers - 1) * 100);
+      if (repeatRate < 0) repeatRate = 0;
+    }
+
+    // 🔥 7 Gün Segment
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: visitsLast7 } = await supabaseClient
+      .from("visits")
+      .select("customer_id")
+      .eq("business_id", b.id)
+      .gte("visit_date", sevenDaysAgo.toISOString());
+
+    const visitCountByCustomer = {};
+
+    visitsLast7.forEach(v => {
+      if (!visitCountByCustomer[v.customer_id]) {
+        visitCountByCustomer[v.customer_id] = 0;
+      }
+      visitCountByCustomer[v.customer_id]++;
+    });
+
+    let newCount = 0;
+    let growingCount = 0;
+    let loyalCount = 0;
+
+    Object.values(visitCountByCustomer).forEach(count => {
+      if (count === 1) newCount++;
+      else if (count >= 2 && count <= 4) growingCount++;
+      else if (count >= 5) loyalCount++;
+    });
+
     html += `
-      <div class="border p-4 rounded mb-4">
-        <h2 class="font-semibold mb-2">${b.name}</h2>
-        <p>Müşteri: ${totalCustomers || 0}</p>
-        <p>Ziyaret: ${totalVisits || 0}</p>
+      <div class="border p-6 rounded mb-6">
+        <h2 class="font-semibold text-lg mb-4">${b.name}</h2>
+
+        <div class="grid grid-cols-3 gap-4 text-center mb-4">
+          <div>
+            <p class="text-xs text-gray-500">Müşteri</p>
+            <p class="font-bold">${totalCustomers || 0}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Ziyaret</p>
+            <p class="font-bold">${totalVisits || 0}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">Tekrar Oranı</p>
+            <p class="font-bold">${repeatRate}%</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 text-center">
+          <div class="bg-green-50 p-2 rounded">
+            <p class="text-xs">Yeni</p>
+            <p class="font-bold text-green-600">${newCount}</p>
+          </div>
+          <div class="bg-yellow-50 p-2 rounded">
+            <p class="text-xs">Gelişen</p>
+            <p class="font-bold text-yellow-600">${growingCount}</p>
+          </div>
+          <div class="bg-blue-50 p-2 rounded">
+            <p class="text-xs">Sadık</p>
+            <p class="font-bold text-blue-600">${loyalCount}</p>
+          </div>
+        </div>
+
       </div>
     `;
   }
