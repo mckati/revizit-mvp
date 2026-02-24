@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit - İşletme Paneli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 p-10">
+
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow">
+
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-2xl font-bold">İşletme Paneli</h1>
+    <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
+  </div>
+
+  <div class="grid grid-cols-3 gap-4 mb-8 text-center">
+    <div class="bg-gray-50 p-4 rounded">
+      <p class="text-xs text-gray-500">Toplam Müşteri</p>
+      <p id="totalCustomers" class="text-xl font-bold">0</p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded">
+      <p class="text-xs text-gray-500">Toplam Ziyaret</p>
+      <p id="totalVisits" class="text-xl font-bold">0</p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded">
+      <p class="text-xs text-gray-500">Tekrar Oranı</p>
+      <p id="repeatRate" class="text-xl font-bold">0%</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const supabaseClient = supabase.createClient(
+  'https://hyqlhnraoumjsxaxefez.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
+);
+
+let businessId = null;
+
+async function init() {
+
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (!data.user) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  if (data.user.user_metadata.role !== "business") {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  businessId = data.user.user_metadata.business_id;
+
+  loadDashboard();
+}
+
+async function loadDashboard() {
+
+  let { count: totalCustomers } = await supabaseClient
+    .from("customers")
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", businessId);
+
+  let { count: totalVisits } = await supabaseClient
+    .from("visits")
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", businessId);
+
+  let repeatRate = 0;
+  if (totalCustomers > 0) {
+    repeatRate = Math.round((totalVisits / totalCustomers - 1) * 100);
+    if (repeatRate < 0) repeatRate = 0;
+  }
+
+  document.getElementById("totalCustomers").innerText = totalCustomers || 0;
+  document.getElementById("totalVisits").innerText = totalVisits || 0;
+  document.getElementById("repeatRate").innerText = repeatRate + "%";
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "/login.html";
+}
+
+init();
+
+</script>
+
+</body>
+</html>
