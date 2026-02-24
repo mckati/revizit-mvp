@@ -20,13 +20,39 @@
       maxlength="13"
       inputmode="numeric"
       class="border p-2 w-full rounded text-center text-lg tracking-wider"/>
-    
+
     <button id="confirmBtn"
       onclick="completeVisit()"
       disabled
       class="bg-gray-300 text-white px-4 py-2 rounded w-full cursor-not-allowed">
       Onayla
     </button>
+  </div>
+
+  <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
+    <div class="relative w-32 h-40">
+
+      <!-- Cup Outline -->
+      <svg viewBox="0 0 120 160" class="absolute inset-0 w-full h-full">
+        <path d="M30 20 L90 20 L80 150 L40 150 Z"
+              fill="none"
+              stroke="#000"
+              stroke-width="3"/>
+        <!-- Level lines -->
+        <line x1="40" y1="115" x2="80" y2="115" stroke="#999" stroke-width="2"/>
+        <line x1="40" y1="85" x2="80" y2="85" stroke="#999" stroke-width="2"/>
+        <line x1="40" y1="55" x2="80" y2="55" stroke="#999" stroke-width="2"/>
+      </svg>
+
+      <!-- Coffee Fill -->
+      <div id="coffeeFill"
+        class="absolute bottom-0 left-1/2 -translate-x-1/2 w-20 bg-amber-700 rounded-b-lg transition-all duration-700"
+        style="height:0%;">
+      </div>
+
+    </div>
+
+    <div id="rewardMessage" class="text-sm font-medium"></div>
   </div>
 
 </div>
@@ -47,131 +73,83 @@ let tokenValue = null;
 const phoneInput = document.getElementById("phone");
 const confirmBtn = document.getElementById("confirmBtn");
 
-/* ========================
-   TELEFON FORMAT + BUTON
-======================== */
+/* ================= PHONE FORMAT ================= */
 
 phoneInput?.addEventListener("input", function(e) {
 
   let digits = e.target.value.replace(/\D/g, "");
 
-  if (digits.length > 11) {
-    digits = digits.slice(0, 11);
-  }
+  if (digits.length > 11) digits = digits.slice(0, 11);
 
   let formatted = "";
 
-  if (digits.length > 0) {
-    formatted += digits.substring(0, 4);
-  }
-  if (digits.length >= 5) {
-    formatted += " " + digits.substring(4, 7);
-  }
-  if (digits.length >= 8) {
-    formatted += " " + digits.substring(7, 11);
-  }
+  if (digits.length > 0) formatted += digits.substring(0, 4);
+  if (digits.length >= 5) formatted += " " + digits.substring(4, 7);
+  if (digits.length >= 8) formatted += " " + digits.substring(7, 11);
 
   e.target.value = formatted;
 
-  // Buton aktiflik kontrolü
   if (/^05\d{9}$/.test(digits)) {
     confirmBtn.disabled = false;
-    confirmBtn.classList.remove("bg-gray-300", "cursor-not-allowed");
+    confirmBtn.classList.remove("bg-gray-300","cursor-not-allowed");
     confirmBtn.classList.add("bg-black");
   } else {
     confirmBtn.disabled = true;
-    confirmBtn.classList.add("bg-gray-300", "cursor-not-allowed");
-    confirmBtn.classList.remove("bg-black");
   }
 });
 
-function cleanPhoneNumber(formattedPhone) {
-  return formattedPhone.replace(/\D/g, "");
-}
+function cleanPhoneNumber(v){ return v.replace(/\D/g,""); }
 
-/* ========================
-   GENEL AKIŞ
-======================== */
+/* ================= FLOW ================= */
 
-function getTokenFromURL() {
+function getTokenFromURL(){
   const params = new URLSearchParams(window.location.search);
   return params.get("token");
 }
 
-function showError(message) {
+function showError(msg){
   document.getElementById("status").innerHTML =
-    `<p class="text-red-500 text-sm">${message}</p>`;
-  document.getElementById("phoneArea").classList.add("hidden");
+    `<p class="text-red-500 text-sm">${msg}</p>`;
 }
 
-function showPhoneInput() {
+function showPhoneInput(){
   document.getElementById("status").innerHTML =
     `<p class="text-sm text-gray-500">Telefon numaranızı girin</p>`;
   document.getElementById("phoneArea").classList.remove("hidden");
 }
 
-function showSuccessAndClose() {
-  document.getElementById("status").innerHTML =
-    `<div class="text-green-600 space-y-2">
-        <p class="font-semibold text-lg">Teşekkür ederiz ☕</p>
-        <p class="text-sm">Ziyaretiniz başarıyla kaydedildi.</p>
-     </div>`;
-
-  document.getElementById("phoneArea").classList.add("hidden");
-
-  setTimeout(() => {
-    window.close(); // tarayıcı izin vermezse aşağıdaki çalışır
-    window.location.href = "about:blank";
-  }, 3000);
-}
-
-async function init() {
+async function init(){
 
   tokenValue = getTokenFromURL();
+  if(!tokenValue){ showError("Geçersiz QR."); return; }
 
-  if (!tokenValue) {
-    showError("Geçersiz QR.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient
+  const { data } = await supabaseClient
     .from("qr_tokens")
     .select("*")
     .eq("token", tokenValue)
     .single();
 
-  if (error || !data) {
-    showError("QR geçersiz veya daha önce kullanılmış.");
-    return;
-  }
+  if(!data){ showError("QR geçersiz veya kullanılmış."); return; }
 
-  if (new Date(data.expires_at) < new Date()) {
-    showError("QR süresi dolmuş. Lütfen kasiyerden yeni QR isteyin.");
-    await supabaseClient
-      .from("qr_tokens")
-      .delete()
-      .eq("token", tokenValue);
+  if(new Date(data.expires_at) < new Date()){
+    showError("QR süresi dolmuş.");
     return;
   }
 
   tokenData = data;
-
-  const savedPhone =
-    localStorage.getItem("revizit_phone_" + data.business_id);
-
-  if (savedPhone) {
-    await completeVisit(savedPhone, true);
-  } else {
-    showPhoneInput();
-  }
+  showPhoneInput();
 }
 
-async function completeVisit(phoneOverride = null, silent = false) {
+/* ================= VISIT ================= */
 
-  let phone =
-    phoneOverride || document.getElementById("phone").value.trim();
+async function completeVisit(){
 
-  phone = cleanPhoneNumber(phone);
+  let phone = cleanPhoneNumber(phoneInput.value);
+
+  if(!/^05\d{9}$/.test(phone)){
+    showError("Geçerli numara giriniz.");
+    return;
+  }
 
   const businessId = tokenData.business_id;
   const band = tokenData.spending_band;
@@ -185,52 +163,38 @@ async function completeVisit(phoneOverride = null, silent = false) {
 
   let customerId;
 
-  if (!customer) {
-    const { data: newCustomer } = await supabaseClient
+  if(!customer){
+    const { data:newCustomer } = await supabaseClient
       .from("customers")
-      .insert({
-        phone: phone,
-        business_id: businessId
-      })
-      .select()
-      .single();
-
+      .insert({ phone, business_id:businessId })
+      .select().single();
     customerId = newCustomer.id;
   } else {
     customerId = customer.id;
   }
 
+  // Günlük limit
   const todayStart = new Date();
   todayStart.setHours(0,0,0,0);
 
-  const todayEnd = new Date();
-  todayEnd.setHours(23,59,59,999);
-
-  const { data: todayVisits } = await supabaseClient
+  const { data:todayVisits } = await supabaseClient
     .from("visits")
     .select("*")
     .eq("business_id", businessId)
     .eq("customer_id", customerId)
-    .gte("visit_date", todayStart.toISOString())
-    .lte("visit_date", todayEnd.toISOString());
+    .gte("visit_date", todayStart.toISOString());
 
-  if (todayVisits.length > 0) {
-
-    await supabaseClient
-      .from("qr_tokens")
-      .delete()
-      .eq("token", tokenValue);
-
-    showError("Bugün zaten ziyaret kaydınız bulunmaktadır. Günlük ziyaret kaydı limiti 1 ile sınırlıdır.");
+  if(todayVisits.length>0){
+    showError("Bugün zaten ziyaret kaydınız var.");
     return;
   }
 
   await supabaseClient
     .from("visits")
     .insert({
-      business_id: businessId,
-      customer_id: customerId,
-      spending_band: band
+      business_id:businessId,
+      customer_id:customerId,
+      spending_band:band
     });
 
   await supabaseClient
@@ -238,12 +202,48 @@ async function completeVisit(phoneOverride = null, silent = false) {
     .delete()
     .eq("token", tokenValue);
 
-  localStorage.setItem(
-    "revizit_phone_" + businessId,
-    phone
-  );
+  showCupAnimation(customerId,businessId);
+}
 
-  showSuccessAndClose();
+/* ================= CUP ANIMATION ================= */
+
+async function showCupAnimation(customerId,businessId){
+
+  document.getElementById("status").innerHTML =
+    `<p class="text-green-600 font-semibold">
+      Kaydınız tamamlandı.<br/>Ziyaretiniz başarıyla kaydedildi.
+     </p>`;
+
+  document.getElementById("phoneArea").classList.add("hidden");
+  document.getElementById("cupArea").classList.remove("hidden");
+
+  const { data:visits } = await supabaseClient
+    .from("visits")
+    .select("*")
+    .eq("business_id",businessId)
+    .eq("customer_id",customerId);
+
+  const visitCount = visits.length;
+  const level = visitCount % 4 === 0 ? 4 : visitCount % 4;
+
+  const fillPercent = level * 25;
+
+  setTimeout(()=>{
+    document.getElementById("coffeeFill")
+      .style.height = fillPercent + "%";
+  },200);
+
+  if(level === 4){
+    document.getElementById("rewardMessage").innerHTML =
+      "🎉 Tebrikler! Ödül kazandınız! Bir sonraki ziyaretinizde ikinci kahveniz bizden.";
+  } else {
+    document.getElementById("rewardMessage").innerHTML =
+      `${level}/4 tamamlandı`;
+  }
+
+  setTimeout(()=>{
+    window.location.href="about:blank";
+  },4000);
 }
 
 init();
