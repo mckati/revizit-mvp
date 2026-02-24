@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit - Admin Paneli</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 p-10">
+
+<div class="max-w-5xl mx-auto bg-white p-8 rounded-xl shadow">
+
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-2xl font-bold">Admin Paneli</h1>
+    <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
+  </div>
+
+  <div id="businessList"></div>
+
+</div>
+
+<script>
+
+const supabaseClient = supabase.createClient(
+  'https://hyqlhnraoumjsxaxefez.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
+);
+
+async function init() {
+
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (!data.user) {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  if (data.user.user_metadata.role !== "admin") {
+    window.location.href = "/login.html";
+    return;
+  }
+
+  loadBusinesses();
+}
+
+async function loadBusinesses() {
+
+  const { data: businesses } = await supabaseClient
+    .from("businesses")
+    .select("*");
+
+  let html = "";
+
+  for (let b of businesses) {
+
+    const { count: totalCustomers } = await supabaseClient
+      .from("customers")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", b.id);
+
+    const { count: totalVisits } = await supabaseClient
+      .from("visits")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", b.id);
+
+    html += `
+      <div class="border p-4 rounded mb-4">
+        <h2 class="font-semibold mb-2">${b.name}</h2>
+        <p>Müşteri: ${totalCustomers || 0}</p>
+        <p>Ziyaret: ${totalVisits || 0}</p>
+      </div>
+    `;
+  }
+
+  document.getElementById("businessList").innerHTML = html;
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  window.location.href = "/login.html";
+}
+
+init();
+
+</script>
+
+</body>
+</html>
