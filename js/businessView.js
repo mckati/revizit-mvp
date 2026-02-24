@@ -11,22 +11,22 @@ async function renderBusinessView(containerId, businessId, prefix) {
 
         <div class="grid grid-cols-3 gap-4 text-center">
 
-          <div>
+          <div class="bg-gray-50 p-4 rounded">
             <p class="text-xs text-gray-500">Aktif Müşteri (30g)</p>
-            <p id="${prefix}customers30" class="font-bold">0</p>
-            <p id="${prefix}customersChange" class="text-xs"></p>
+            <p id="${prefix}customers30" class="text-xl font-bold">0</p>
+            <p id="${prefix}customersChange" class="text-xs mt-1"></p>
           </div>
 
-          <div>
+          <div class="bg-gray-50 p-4 rounded">
             <p class="text-xs text-gray-500">Ziyaret (30g)</p>
-            <p id="${prefix}visits30" class="font-bold">0</p>
-            <p id="${prefix}visitsChange" class="text-xs"></p>
+            <p id="${prefix}visits30" class="text-xl font-bold">0</p>
+            <p id="${prefix}visitsChange" class="text-xs mt-1"></p>
           </div>
 
-          <div>
+          <div class="bg-gray-50 p-4 rounded">
             <p class="text-xs text-gray-500">Tekrar Oranı (30g)</p>
-            <p id="${prefix}repeat30" class="font-bold">0%</p>
-            <p id="${prefix}repeatChange" class="text-xs"></p>
+            <p id="${prefix}repeat30" class="text-xl font-bold">0%</p>
+            <p id="${prefix}repeatChange" class="text-xs mt-1"></p>
           </div>
 
         </div>
@@ -41,38 +41,54 @@ async function renderBusinessView(containerId, businessId, prefix) {
       <!-- SEGMENT 7 -->
       <div>
         <h3 class="font-semibold mb-4">Son 7 Gün Segmentasyonu</h3>
+
         <div class="grid grid-cols-3 gap-4 text-center">
-          <div>
+
+          <div class="bg-green-50 p-4 rounded">
             <p class="text-xs text-gray-500">Yeni (1 ziyaret)</p>
-            <p id="${prefix}segmentNew7" class="font-bold">0</p>
+            <p id="${prefix}segmentNew7"
+               class="text-xl font-bold text-green-600">0</p>
           </div>
-          <div>
+
+          <div class="bg-yellow-50 p-4 rounded">
             <p class="text-xs text-gray-500">Gelişen (2–4 ziyaret)</p>
-            <p id="${prefix}segmentGrow7" class="font-bold">0</p>
+            <p id="${prefix}segmentGrow7"
+               class="text-xl font-bold text-yellow-600">0</p>
           </div>
-          <div>
+
+          <div class="bg-blue-50 p-4 rounded">
             <p class="text-xs text-gray-500">Sadık (5+ ziyaret)</p>
-            <p id="${prefix}segmentLoyal7" class="font-bold">0</p>
+            <p id="${prefix}segmentLoyal7"
+               class="text-xl font-bold text-blue-600">0</p>
           </div>
+
         </div>
       </div>
 
       <!-- SEGMENT 30 -->
       <div>
         <h3 class="font-semibold mb-4">Son 30 Gün Segmentasyonu</h3>
+
         <div class="grid grid-cols-3 gap-4 text-center">
-          <div>
+
+          <div class="bg-green-50 p-4 rounded">
             <p class="text-xs text-gray-500">Yeni (1 ziyaret)</p>
-            <p id="${prefix}segmentNew30" class="font-bold">0</p>
+            <p id="${prefix}segmentNew30"
+               class="text-xl font-bold text-green-600">0</p>
           </div>
-          <div>
+
+          <div class="bg-yellow-50 p-4 rounded">
             <p class="text-xs text-gray-500">Gelişen (2–4 ziyaret)</p>
-            <p id="${prefix}segmentGrow30" class="font-bold">0</p>
+            <p id="${prefix}segmentGrow30"
+               class="text-xl font-bold text-yellow-600">0</p>
           </div>
-          <div>
+
+          <div class="bg-blue-50 p-4 rounded">
             <p class="text-xs text-gray-500">Sadık (5+ ziyaret)</p>
-            <p id="${prefix}segmentLoyal30" class="font-bold">0</p>
+            <p id="${prefix}segmentLoyal30"
+               class="text-xl font-bold text-blue-600">0</p>
           </div>
+
         </div>
       </div>
 
@@ -103,10 +119,8 @@ async function renderBusinessView(containerId, businessId, prefix) {
     </div>
   `;
 
-  // KPI + All time
   await loadKPIs(businessId, prefix);
 
-  // All time count ekleyelim
   let { count: allCustomers } = await supabaseClient
     .from("customers")
     .select("*", { count: "exact", head: true })
@@ -117,18 +131,18 @@ async function renderBusinessView(containerId, businessId, prefix) {
     .select("*", { count: "exact", head: true })
     .eq("business_id", businessId);
 
-  document.getElementById(prefix + "allCustomers").innerText = allCustomers || 0;
-  document.getElementById(prefix + "allVisits").innerText = allVisits || 0;
+  document.getElementById(prefix + "allCustomers").innerText =
+    allCustomers || 0;
 
-  // Segments
+  document.getElementById(prefix + "allVisits").innerText =
+    allVisits || 0;
+
   await loadSegments(businessId, 7, prefix);
   await loadSegments(businessId, 30, prefix);
 
-  // Bands
   await loadBand(businessId, 7, prefix + "band7");
   await loadBand(businessId, 30, prefix + "band30");
 
-  // Trends
   await loadTrend30(businessId, prefix + "trend30");
   await loadHourly7(businessId, prefix + "trend7hour");
 }
