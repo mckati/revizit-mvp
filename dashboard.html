@@ -15,63 +15,38 @@
     <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
   </div>
 
-  <!-- KPI -->
-  <div class="grid grid-cols-3 gap-4 mb-10 text-center">
+  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Performansı</h2>
+
+  <div class="grid grid-cols-3 gap-4 mb-3 text-center">
+
     <div class="bg-gray-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Toplam Müşteri</p>
-      <p id="totalCustomers" class="text-xl font-bold">0</p>
+      <p class="text-xs text-gray-500">Aktif Müşteri (30g)</p>
+      <p id="customers30" class="text-xl font-bold">0</p>
+      <p id="customersChange" class="text-xs mt-1"></p>
     </div>
+
     <div class="bg-gray-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Toplam Ziyaret</p>
-      <p id="totalVisits" class="text-xl font-bold">0</p>
+      <p class="text-xs text-gray-500">Ziyaret (30g)</p>
+      <p id="visits30" class="text-xl font-bold">0</p>
+      <p id="visitsChange" class="text-xs mt-1"></p>
     </div>
+
     <div class="bg-gray-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Tekrar Oranı</p>
-      <p id="repeatRate" class="text-xl font-bold">0%</p>
+      <p class="text-xs text-gray-500">Tekrar Oranı (30g)</p>
+      <p id="repeat30" class="text-xl font-bold">0%</p>
+      <p id="repeatChange" class="text-xs mt-1"></p>
     </div>
+
   </div>
 
-  <!-- Segment 7 Gün -->
-  <h2 class="text-lg font-semibold mb-4">Son 7 Gün Segmentasyonu</h2>
-  <div class="grid grid-cols-3 gap-4 text-center mb-8">
-    <div class="bg-green-50 p-4 rounded">
-      <p class="text-xs">Yeni (1)</p>
-      <p id="segmentNew7" class="text-xl font-bold text-green-600">0</p>
-    </div>
-    <div class="bg-yellow-50 p-4 rounded">
-      <p class="text-xs">Gelişen (2-4)</p>
-      <p id="segmentGrow7" class="text-xl font-bold text-yellow-600">0</p>
-    </div>
-    <div class="bg-blue-50 p-4 rounded">
-      <p class="text-xs">Sadık (5+)</p>
-      <p id="segmentLoyal7" class="text-xl font-bold text-blue-600">0</p>
-    </div>
-  </div>
+  <p class="text-xs text-gray-400 mb-10">
+    Tüm Zamanlar: 
+    <span id="allCustomers">0</span> müşteri • 
+    <span id="allVisits">0</span> ziyaret
+  </p>
 
-  <!-- Segment 30 Gün -->
-  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Segmentasyonu</h2>
-  <div class="grid grid-cols-3 gap-4 text-center mb-10">
-    <div class="bg-green-50 p-4 rounded">
-      <p class="text-xs">Yeni (1)</p>
-      <p id="segmentNew30" class="text-xl font-bold text-green-600">0</p>
-    </div>
-    <div class="bg-yellow-50 p-4 rounded">
-      <p class="text-xs">Gelişen (2-4)</p>
-      <p id="segmentGrow30" class="text-xl font-bold text-yellow-600">0</p>
-    </div>
-    <div class="bg-blue-50 p-4 rounded">
-      <p class="text-xs">Sadık (5+)</p>
-      <p id="segmentLoyal30" class="text-xl font-bold text-blue-600">0</p>
-    </div>
-  </div>
-
-  <!-- 30 Günlük Trend -->
   <h2 class="text-lg font-semibold mb-4">Son 30 Gün Günlük Trend</h2>
   <canvas id="trend30" height="90"></canvas>
-
-  <!-- 7 Gün Saatlik Trend -->
-  <h2 class="text-lg font-semibold mt-12 mb-4">Son 7 Gün Saatlik Dağılım</h2>
-  <canvas id="trend7hour" height="90"></canvas>
 
 </div>
 
@@ -84,76 +59,108 @@ const supabaseClient = supabase.createClient(
 
 let businessId;
 
-async function init() {
+async function init(){
 
   const { data } = await supabaseClient.auth.getUser();
-  if (!data.user || data.user.user_metadata.role !== "business") {
-    window.location.href = "/login.html";
+
+  if(!data.user || data.user.user_metadata.role!=="business"){
+    window.location.href="/login.html";
     return;
   }
 
-  businessId = data.user.user_metadata.business_id;
+  businessId=data.user.user_metadata.business_id;
 
   await loadKPIs();
-  await loadSegments(7);
-  await loadSegments(30);
   await loadTrend30();
-  await loadHourlyTrend7();
 }
 
-async function loadKPIs() {
+function calculateChange(current, previous){
+  if(previous === 0){
+    return current > 0 ? 100 : 0;
+  }
+  return Math.round(((current - previous) / previous) * 100);
+}
 
-  let { count: totalCustomers } = await supabaseClient
+function formatChange(percent){
+  if(percent > 0)
+    return `<span class="text-green-600">↑ ${percent}%</span>`;
+  if(percent < 0)
+    return `<span class="text-red-600">↓ ${Math.abs(percent)}%</span>`;
+  return `<span class="text-gray-500">→ 0%</span>`;
+}
+
+async function loadKPIs(){
+
+  const now=new Date();
+
+  const startCurrent=new Date();
+  startCurrent.setDate(now.getDate()-30);
+
+  const startPrevious=new Date();
+  startPrevious.setDate(now.getDate()-60);
+
+  const { data: currentVisits } = await supabaseClient
+    .from("visits")
+    .select("customer_id")
+    .eq("business_id",businessId)
+    .gte("visit_date",startCurrent.toISOString());
+
+  const { data: previousVisits } = await supabaseClient
+    .from("visits")
+    .select("customer_id")
+    .eq("business_id",businessId)
+    .gte("visit_date",startPrevious.toISOString())
+    .lt("visit_date",startCurrent.toISOString());
+
+  // CURRENT
+  const currentCustomersSet=new Set();
+  currentVisits.forEach(v=>currentCustomersSet.add(v.customer_id));
+
+  const currentCustomers=currentCustomersSet.size;
+  const currentVisitsCount=currentVisits.length;
+
+  const currentRepeat=currentCustomers>0
+    ? Math.max(0,Math.round((currentVisitsCount/currentCustomers-1)*100))
+    : 0;
+
+  // PREVIOUS
+  const previousCustomersSet=new Set();
+  previousVisits.forEach(v=>previousCustomersSet.add(v.customer_id));
+
+  const previousCustomers=previousCustomersSet.size;
+  const previousVisitsCount=previousVisits.length;
+
+  const previousRepeat=previousCustomers>0
+    ? Math.max(0,Math.round((previousVisitsCount/previousCustomers-1)*100))
+    : 0;
+
+  // SET VALUES
+  document.getElementById("customers30").innerText=currentCustomers;
+  document.getElementById("visits30").innerText=currentVisitsCount;
+  document.getElementById("repeat30").innerText=currentRepeat+"%";
+
+  document.getElementById("customersChange").innerHTML=
+    formatChange(calculateChange(currentCustomers,previousCustomers));
+
+  document.getElementById("visitsChange").innerHTML=
+    formatChange(calculateChange(currentVisitsCount,previousVisitsCount));
+
+  document.getElementById("repeatChange").innerHTML=
+    formatChange(calculateChange(currentRepeat,previousRepeat));
+
+  // All time
+  let { count: allCustomers } = await supabaseClient
     .from("customers")
     .select("*",{count:"exact",head:true})
     .eq("business_id",businessId);
 
-  let { count: totalVisits } = await supabaseClient
+  let { count: allVisits } = await supabaseClient
     .from("visits")
     .select("*",{count:"exact",head:true})
     .eq("business_id",businessId);
 
-  let repeatRate = totalCustomers>0
-    ? Math.max(0,Math.round((totalVisits/totalCustomers-1)*100))
-    : 0;
-
-  document.getElementById("totalCustomers").innerText=totalCustomers||0;
-  document.getElementById("totalVisits").innerText=totalVisits||0;
-  document.getElementById("repeatRate").innerText=repeatRate+"%";
-}
-
-async function loadSegments(days){
-
-  const date=new Date();
-  date.setDate(date.getDate()-days);
-
-  const { data: visits } = await supabaseClient
-    .from("visits")
-    .select("customer_id")
-    .eq("business_id",businessId)
-    .gte("visit_date",date.toISOString());
-
-  const counts={};
-  visits.forEach(v=>{
-    counts[v.customer_id]=(counts[v.customer_id]||0)+1;
-  });
-
-  let n=0,g=0,l=0;
-  Object.values(counts).forEach(c=>{
-    if(c===1)n++;
-    else if(c<=4)g++;
-    else l++;
-  });
-
-  if(days===7){
-    document.getElementById("segmentNew7").innerText=n;
-    document.getElementById("segmentGrow7").innerText=g;
-    document.getElementById("segmentLoyal7").innerText=l;
-  }else{
-    document.getElementById("segmentNew30").innerText=n;
-    document.getElementById("segmentGrow30").innerText=g;
-    document.getElementById("segmentLoyal30").innerText=l;
-  }
+  document.getElementById("allCustomers").innerText=allCustomers||0;
+  document.getElementById("allVisits").innerText=allVisits||0;
 }
 
 async function loadTrend30(){
@@ -169,14 +176,12 @@ async function loadTrend30(){
     .gte("visit_date",start.toISOString());
 
   const daily={};
-
   visits.forEach(v=>{
     const d=new Date(v.visit_date).toISOString().split("T")[0];
     daily[d]=(daily[d]||0)+1;
   });
 
   const labels=[],values=[];
-
   for(let i=30;i>=0;i--){
     const d=new Date();
     d.setDate(today.getDate()-i);
@@ -190,34 +195,6 @@ async function loadTrend30(){
     data:{
       labels:labels,
       datasets:[{label:"Toplam Ziyaret",data:values,borderColor:"black"}]
-    },
-    options:{responsive:true}
-  });
-}
-
-async function loadHourlyTrend7(){
-
-  const date=new Date();
-  date.setDate(date.getDate()-7);
-
-  const { data: visits } = await supabaseClient
-    .from("visits")
-    .select("visit_date")
-    .eq("business_id",businessId)
-    .gte("visit_date",date.toISOString());
-
-  const hours=Array(24).fill(0);
-
-  visits.forEach(v=>{
-    const h=new Date(v.visit_date).getHours();
-    hours[h]++;
-  });
-
-  new Chart(document.getElementById("trend7hour"),{
-    type:"bar",
-    data:{
-      labels:Array.from({length:24},(_,i)=>i+":00"),
-      datasets:[{label:"Ziyaret Sayısı",data:hours,backgroundColor:"black"}]
     },
     options:{responsive:true}
   });
