@@ -2,144 +2,133 @@
 <html>
 <head>
   <title>Revizit - Admin Paneli</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MODÜLLER -->
+  <script src="/js/supabase.js"></script>
+  <script src="/js/kpi.js"></script>
+  <script src="/js/segment.js"></script>
+  <script src="/js/band.js"></script>
+  <script src="/js/trend.js"></script>
+
 </head>
 <body class="bg-gray-100 p-10">
 
-<div class="max-w-6xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-6xl mx-auto space-y-6">
 
-  <div class="flex justify-between items-center mb-8">
+  <div class="flex justify-between items-center">
     <h1 class="text-2xl font-bold">Admin Paneli</h1>
     <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
   </div>
 
-  <div id="businessList"></div>
+  <div id="businessList" class="space-y-4"></div>
 
 </div>
 
 <script>
 
-const supabaseClient = supabase.createClient(
-  'https://hyqlhnraoumjsxaxefez.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
-);
+(async function(){
 
-async function init() {
-
-  const { data } = await supabaseClient.auth.getUser();
-
-  if (!data.user || data.user.user_metadata.role !== "admin") {
-    window.location.href = "/login.html";
-    return;
-  }
-
-  loadBusinesses();
-}
-
-async function loadBusinesses() {
+  const ok = await requireAdminAuth();
+  if (!ok) return;
 
   const { data: businesses } = await supabaseClient
     .from("businesses")
     .select("*");
 
-  let html = "";
+  const container = document.getElementById("businessList");
 
-  for (let b of businesses) {
+  businesses.forEach(b => {
 
-    // Genel KPI
-    const { count: totalCustomers } = await supabaseClient
-      .from("customers")
-      .select("*", { count: "exact", head: true })
-      .eq("business_id", b.id);
+    const card = document.createElement("div");
+    card.className = "bg-white p-6 rounded-xl shadow";
 
-    const { count: totalVisits } = await supabaseClient
-      .from("visits")
-      .select("*", { count: "exact", head: true })
-      .eq("business_id", b.id);
+    card.innerHTML = `
+      <div class="flex justify-between items-center cursor-pointer"
+           onclick="toggleDetails('${b.id}')">
+        <h2 class="text-lg font-semibold">${b.name}</h2>
+        <span class="text-sm text-gray-500">Detay ▼</span>
+      </div>
 
-    let repeatRate = 0;
-    if (totalCustomers > 0) {
-      repeatRate = Math.round((totalVisits / totalCustomers - 1) * 100);
-      if (repeatRate < 0) repeatRate = 0;
-    }
+      <div id="details_${b.id}" class="hidden mt-6 space-y-8">
 
-    // 🔥 7 Gün Segment
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const { data: visitsLast7 } = await supabaseClient
-      .from("visits")
-      .select("customer_id")
-      .eq("business_id", b.id)
-      .gte("visit_date", sevenDaysAgo.toISOString());
-
-    const visitCountByCustomer = {};
-
-    visitsLast7.forEach(v => {
-      if (!visitCountByCustomer[v.customer_id]) {
-        visitCountByCustomer[v.customer_id] = 0;
-      }
-      visitCountByCustomer[v.customer_id]++;
-    });
-
-    let newCount = 0;
-    let growingCount = 0;
-    let loyalCount = 0;
-
-    Object.values(visitCountByCustomer).forEach(count => {
-      if (count === 1) newCount++;
-      else if (count >= 2 && count <= 4) growingCount++;
-      else if (count >= 5) loyalCount++;
-    });
-
-    html += `
-      <div class="border p-6 rounded mb-6">
-        <h2 class="font-semibold text-lg mb-4">${b.name}</h2>
-
-        <div class="grid grid-cols-3 gap-4 text-center mb-4">
+        <!-- KPI -->
+        <div class="grid grid-cols-3 gap-4 text-center">
           <div>
-            <p class="text-xs text-gray-500">Müşteri</p>
-            <p class="font-bold">${totalCustomers || 0}</p>
+            <p class="text-xs text-gray-500">Aktif Müşteri</p>
+            <p id="${b.id}_customers30" class="font-bold">0</p>
+            <p id="${b.id}_customersChange" class="text-xs"></p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Ziyaret</p>
-            <p class="font-bold">${totalVisits || 0}</p>
+            <p id="${b.id}_visits30" class="font-bold">0</p>
+            <p id="${b.id}_visitsChange" class="text-xs"></p>
           </div>
           <div>
             <p class="text-xs text-gray-500">Tekrar Oranı</p>
-            <p class="font-bold">${repeatRate}%</p>
+            <p id="${b.id}_repeat30" class="font-bold">0%</p>
+            <p id="${b.id}_repeatChange" class="text-xs"></p>
           </div>
         </div>
 
+        <!-- Segment -->
         <div class="grid grid-cols-3 gap-4 text-center">
-          <div class="bg-green-50 p-2 rounded">
-            <p class="text-xs">Yeni</p>
-            <p class="font-bold text-green-600">${newCount}</p>
+          <div>
+            <p class="text-xs text-gray-500">Yeni (7g)</p>
+            <p id="${b.id}_segmentNew7" class="font-bold">0</p>
           </div>
-          <div class="bg-yellow-50 p-2 rounded">
-            <p class="text-xs">Gelişen</p>
-            <p class="font-bold text-yellow-600">${growingCount}</p>
+          <div>
+            <p class="text-xs text-gray-500">Gelişen (7g)</p>
+            <p id="${b.id}_segmentGrow7" class="font-bold">0</p>
           </div>
-          <div class="bg-blue-50 p-2 rounded">
-            <p class="text-xs">Sadık</p>
-            <p class="font-bold text-blue-600">${loyalCount}</p>
+          <div>
+            <p class="text-xs text-gray-500">Sadık (7g)</p>
+            <p id="${b.id}_segmentLoyal7" class="font-bold">0</p>
           </div>
+        </div>
+
+        <!-- Band -->
+        <div>
+          <h3 class="font-semibold mb-2">Harcama Bandı (30g)</h3>
+          <div id="${b.id}_band30"></div>
+        </div>
+
+        <!-- Trend -->
+        <div>
+          <h3 class="font-semibold mb-2">30 Gün Trend</h3>
+          <canvas id="${b.id}_trend30"></canvas>
         </div>
 
       </div>
     `;
+
+    container.appendChild(card);
+
+  });
+
+})();
+
+async function toggleDetails(businessId){
+
+  const el = document.getElementById("details_" + businessId);
+
+  if (!el.classList.contains("hidden")) {
+    el.classList.add("hidden");
+    return;
   }
 
-  document.getElementById("businessList").innerHTML = html;
-}
+  el.classList.remove("hidden");
 
-async function logout() {
-  await supabaseClient.auth.signOut();
-  window.location.href = "/login.html";
-}
+  // Modüler fonksiyonları çağırıyoruz
+  await loadKPIs(businessId, businessId + "_");
+  await loadSegments(businessId, 7, businessId + "_");
+  await loadBand(businessId, 30, businessId + "_band30");
+  await loadTrend30(businessId, businessId + "_trend30");
 
-init();
+}
 
 </script>
 
