@@ -12,7 +12,7 @@
 
   <h1 class="text-xl font-bold mb-6">Kasiyer Paneli</h1>
 
-  <!-- 1️⃣ Ziyaret Başlat Butonu -->
+  <!-- Ziyaret Başlat -->
   <div id="startArea">
     <button onclick="showBands()" 
       class="w-full bg-black text-white p-3 rounded">
@@ -20,7 +20,7 @@
     </button>
   </div>
 
-  <!-- 2️⃣ Harcama Bantları -->
+  <!-- Harcama Bantları -->
   <div id="bandArea" class="hidden mt-4">
     <p class="mb-4 text-sm text-gray-600">Harcama Bandı Seç</p>
 
@@ -37,12 +37,22 @@
     </button>
   </div>
 
-  <!-- 3️⃣ QR Alanı -->
+  <!-- QR Alanı -->
   <div id="qrArea" class="hidden mt-6">
-    <canvas id="qrcode"></canvas>
-    <p class="mt-4 text-sm text-red-500">
-      15 saniye geçerli
+
+    <canvas id="qrcode" class="mx-auto"></canvas>
+
+    <p id="countdownText" class="mt-4 text-sm font-semibold text-gray-700">
+      15
     </p>
+
+    <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+      <div id="progressBar" 
+           class="bg-black h-2 rounded-full transition-all duration-1000"
+           style="width: 100%">
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -56,7 +66,8 @@ const supabaseClient = supabase.createClient(
 
 const businessId = 'c95e305c-adde-4dd5-8cc9-40f8c51bbc74';
 
-// Ziyaret başlatınca bantları göster
+let countdownInterval;
+
 function showBands() {
   document.getElementById("startArea").classList.add("hidden");
   document.getElementById("bandArea").classList.remove("hidden");
@@ -83,7 +94,6 @@ async function startVisit(band) {
   }
 
   const tokenId = tokenData.id;
-
   const qrUrl = window.location.origin + "/scan.html?token=" + tokenId;
 
   document.getElementById("bandArea").classList.add("hidden");
@@ -91,13 +101,39 @@ async function startVisit(band) {
 
   QRCode.toCanvas(document.getElementById('qrcode'), qrUrl);
 
-  // 15 saniye sonra reset
-  setTimeout(() => {
-    resetScreen();
-  }, 15000);
+  startCountdown(15);
+}
+
+function startCountdown(seconds) {
+
+  let timeLeft = seconds;
+  const countdownText = document.getElementById("countdownText");
+  const progressBar = document.getElementById("progressBar");
+
+  countdownText.innerText = timeLeft;
+  progressBar.style.width = "100%";
+
+  countdownInterval = setInterval(() => {
+
+    timeLeft--;
+
+    countdownText.innerText = timeLeft;
+
+    const percentage = (timeLeft / seconds) * 100;
+    progressBar.style.width = percentage + "%";
+
+    if (timeLeft <= 0) {
+      clearInterval(countdownInterval);
+      resetScreen();
+    }
+
+  }, 1000);
 }
 
 function resetScreen() {
+
+  clearInterval(countdownInterval);
+
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("bandArea").classList.add("hidden");
   document.getElementById("startArea").classList.remove("hidden");
@@ -105,6 +141,9 @@ function resetScreen() {
   const canvas = document.getElementById("qrcode");
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  document.getElementById("progressBar").style.width = "100%";
+  document.getElementById("countdownText").innerText = "15";
 }
 
 </script>
