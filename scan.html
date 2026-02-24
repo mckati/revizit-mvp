@@ -74,15 +74,6 @@ async function init() {
     return;
   }
 
-  // 🔥 Güvenli zaman kontrolü (ms karşılaştırması)
-  const nowMs = Date.now();
-  const expireMs = new Date(tokenData.expires_at).getTime();
-
-  if (nowMs > expireMs) {
-    showError("QR süresi dolmuş");
-    return;
-  }
-
   currentToken = tokenData.id;
   currentBand = tokenData.spending_band;
 
@@ -93,7 +84,6 @@ async function init() {
 async function completeVisit() {
 
   const phone = document.getElementById("phoneInput").value;
-
   if (!phone) return;
 
   let { data: existingCustomer } = await supabaseClient
