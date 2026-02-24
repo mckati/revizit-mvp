@@ -2,9 +2,18 @@
 <html>
 <head>
   <title>Revizit - İşletme Paneli</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- MODÜLLER -->
+  <script src="/js/supabase.js"></script>
+  <script src="/js/kpi.js"></script>
+  <script src="/js/segment.js"></script>
+  <script src="/js/band.js"></script>
+  <script src="/js/trend.js"></script>
+
 </head>
 <body class="bg-gray-100 p-10">
 
@@ -40,12 +49,6 @@
       </div>
 
     </div>
-
-    <p class="text-xs text-gray-400 mt-3">
-      Tüm Zamanlar:
-      <span id="allCustomers">0</span> müşteri •
-      <span id="allVisits">0</span> ziyaret
-    </p>
   </div>
 
   <!-- SEGMENT 7 -->
@@ -104,233 +107,33 @@
   <!-- TREND 30 -->
   <div>
     <h2 class="text-lg font-semibold mb-4">Son 30 Gün Günlük Trend</h2>
-    <canvas id="trend30" height="90"></canvas>
+    <canvas id="trend30"></canvas>
   </div>
 
-  <!-- TREND 7 HOURLY -->
+  <!-- TREND 7 -->
   <div>
     <h2 class="text-lg font-semibold mb-4">Son 7 Gün Saatlik Yoğunluk</h2>
-    <canvas id="trend7hour" height="90"></canvas>
+    <canvas id="trend7hour"></canvas>
   </div>
 
 </div>
 
 <script>
+(async function(){
 
-const supabaseClient = supabase.createClient(
-  'https://hyqlhnraoumjsxaxefez.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U'
-);
+  const businessId = await requireBusinessAuth();
+  if (!businessId) return;
 
-let businessId;
+  await loadKPIs(businessId);
+  await loadSegments(businessId, 7);
+  await loadSegments(businessId, 30);
+  await loadBand(businessId, 7, "band7");
+  await loadBand(businessId, 30, "band30");
+  await loadTrend30(businessId, "trend30");
+  await loadHourly7(businessId, "trend7hour");
 
-async function init(){
-  const { data } = await supabaseClient.auth.getUser();
-  if(!data.user || data.user.user_metadata.role!=="business"){
-    window.location.href="/login.html";
-    return;
-  }
-  businessId=data.user.user_metadata.business_id;
-
-  await loadKPIs();
-  await loadSegments(7);
-  await loadSegments(30);
-  await loadBand(7,"band7");
-  await loadBand(30,"band30");
-  await loadTrend30();
-  await loadHourly7();
-}
-
-function calcChange(current,previous){
-  if(previous===0) return current>0?100:0;
-  return Math.round(((current-previous)/previous)*100);
-}
-
-function formatChange(p){
-  if(p>0) return `<span class="text-green-600">↑ ${p}%</span>`;
-  if(p<0) return `<span class="text-red-600">↓ ${Math.abs(p)}%</span>`;
-  return `<span class="text-gray-500">→ 0%</span>`;
-}
-
-async function loadKPIs(){
-
-  const now=new Date();
-  const startCurrent=new Date(); startCurrent.setDate(now.getDate()-30);
-  const startPrevious=new Date(); startPrevious.setDate(now.getDate()-60);
-
-  const { data: current } = await supabaseClient
-    .from("visits")
-    .select("customer_id")
-    .eq("business_id",businessId)
-    .gte("visit_date",startCurrent.toISOString());
-
-  const { data: previous } = await supabaseClient
-    .from("visits")
-    .select("customer_id")
-    .eq("business_id",businessId)
-    .gte("visit_date",startPrevious.toISOString())
-    .lt("visit_date",startCurrent.toISOString());
-
-  const curSet=new Set(current.map(v=>v.customer_id));
-  const prevSet=new Set(previous.map(v=>v.customer_id));
-
-  const curRepeat=curSet.size>0?Math.round((current.length/curSet.size-1)*100):0;
-  const prevRepeat=prevSet.size>0?Math.round((previous.length/prevSet.size-1)*100):0;
-
-  customers30.innerText=curSet.size;
-  visits30.innerText=current.length;
-  repeat30.innerText=curRepeat+"%";
-
-  customersChange.innerHTML=formatChange(calcChange(curSet.size,prevSet.size));
-  visitsChange.innerHTML=formatChange(calcChange(current.length,previous.length));
-  repeatChange.innerHTML=formatChange(calcChange(curRepeat,prevRepeat));
-
-  let { count: allCustomers } = await supabaseClient
-    .from("customers")
-    .select("*",{count:"exact",head:true})
-    .eq("business_id",businessId);
-
-  let { count: allVisits } = await supabaseClient
-    .from("visits")
-    .select("*",{count:"exact",head:true})
-    .eq("business_id",businessId);
-
-  document.getElementById("allCustomers").innerText=allCustomers||0;
-  document.getElementById("allVisits").innerText=allVisits||0;
-}
-
-async function loadSegments(days){
-
-  const date=new Date();
-  date.setDate(date.getDate()-days);
-
-  const { data } = await supabaseClient
-    .from("visits")
-    .select("customer_id")
-    .eq("business_id",businessId)
-    .gte("visit_date",date.toISOString());
-
-  const counts={};
-  data.forEach(v=>counts[v.customer_id]=(counts[v.customer_id]||0)+1);
-
-  let n=0,g=0,l=0;
-  Object.values(counts).forEach(c=>{
-    if(c===1)n++;
-    else if(c<=4)g++;
-    else l++;
-  });
-
-  if(days===7){
-    segmentNew7.innerText=n;
-    segmentGrow7.innerText=g;
-    segmentLoyal7.innerText=l;
-  }else{
-    segmentNew30.innerText=n;
-    segmentGrow30.innerText=g;
-    segmentLoyal30.innerText=l;
-  }
-}
-
-async function loadBand(days,id){
-
-  const date=new Date();
-  date.setDate(date.getDate()-days);
-
-  const { data } = await supabaseClient
-    .from("visits")
-    .select("spending_band")
-    .eq("business_id",businessId)
-    .gte("visit_date",date.toISOString());
-
-  const bands={"0-250":0,"251-500":0,"501-1000":0};
-  data.forEach(v=>bands[v.spending_band]++);
-
-  const total=data.length;
-  let html="";
-
-  for(let b in bands){
-    const p=total>0?Math.round((bands[b]/total)*100):0;
-    html+=`
-      <div class="mb-2">
-        <div class="flex justify-between text-sm">
-          <span>${b}</span><span>${p}%</span>
-        </div>
-        <div class="w-full bg-gray-200 h-2 rounded">
-          <div class="bg-black h-2 rounded" style="width:${p}%"></div>
-        </div>
-      </div>`;
-  }
-
-  document.getElementById(id).innerHTML=html;
-}
-
-async function loadTrend30(){
-
-  const today=new Date();
-  const start=new Date(); start.setDate(today.getDate()-30);
-
-  const { data } = await supabaseClient
-    .from("visits")
-    .select("visit_date")
-    .eq("business_id",businessId)
-    .gte("visit_date",start.toISOString());
-
-  const daily={};
-  data.forEach(v=>{
-    const d=new Date(v.visit_date).toISOString().split("T")[0];
-    daily[d]=(daily[d]||0)+1;
-  });
-
-  const labels=[],values=[];
-  for(let i=30;i>=0;i--){
-    const d=new Date(); d.setDate(today.getDate()-i);
-    const key=d.toISOString().split("T")[0];
-    labels.push(key.slice(5));
-    values.push(daily[key]||0);
-  }
-
-  new Chart(document.getElementById("trend30"),{
-    type:"line",
-    data:{labels:labels,
-    datasets:[{label:"Toplam Ziyaret",data:values,borderColor:"black"}]},
-    options:{responsive:true}
-  });
-}
-
-async function loadHourly7(){
-
-  const date=new Date();
-  date.setDate(date.getDate()-7);
-
-  const { data } = await supabaseClient
-    .from("visits")
-    .select("visit_date")
-    .eq("business_id",businessId)
-    .gte("visit_date",date.toISOString());
-
-  const hours=Array(24).fill(0);
-  data.forEach(v=>{
-    const h=new Date(v.visit_date).getHours();
-    hours[h]++;
-  });
-
-  new Chart(document.getElementById("trend7hour"),{
-    type:"bar",
-    data:{
-      labels:Array.from({length:24},(_,i)=>i+":00"),
-      datasets:[{label:"Ziyaret",data:hours,backgroundColor:"black"}]
-    },
-    options:{responsive:true}
-  });
-}
-
-async function logout(){
-  await supabaseClient.auth.signOut();
-  window.location.href="/login.html";
-}
-
-init();
-
+})();
 </script>
+
 </body>
 </html>
