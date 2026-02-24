@@ -20,8 +20,11 @@
       maxlength="13"
       inputmode="numeric"
       class="border p-2 w-full rounded text-center text-lg tracking-wider"/>
-    <button onclick="completeVisit()"
-      class="bg-black text-white px-4 py-2 rounded w-full">
+    
+    <button id="confirmBtn"
+      onclick="completeVisit()"
+      disabled
+      class="bg-gray-300 text-white px-4 py-2 rounded w-full cursor-not-allowed">
       Onayla
     </button>
   </div>
@@ -41,11 +44,12 @@ const supabaseClient = supabase.createClient(
 let tokenData = null;
 let tokenValue = null;
 
-/* ========================
-   TELEFON FORMAT SİSTEMİ
-======================== */
-
 const phoneInput = document.getElementById("phone");
+const confirmBtn = document.getElementById("confirmBtn");
+
+/* ========================
+   TELEFON FORMAT + BUTON
+======================== */
 
 phoneInput?.addEventListener("input", function(e) {
 
@@ -55,7 +59,6 @@ phoneInput?.addEventListener("input", function(e) {
     digits = digits.slice(0, 11);
   }
 
-  // Format: 05XX XXX XXXX
   let formatted = "";
 
   if (digits.length > 0) {
@@ -69,14 +72,21 @@ phoneInput?.addEventListener("input", function(e) {
   }
 
   e.target.value = formatted;
+
+  // Buton aktiflik kontrolü
+  if (/^05\d{9}$/.test(digits)) {
+    confirmBtn.disabled = false;
+    confirmBtn.classList.remove("bg-gray-300", "cursor-not-allowed");
+    confirmBtn.classList.add("bg-black");
+  } else {
+    confirmBtn.disabled = true;
+    confirmBtn.classList.add("bg-gray-300", "cursor-not-allowed");
+    confirmBtn.classList.remove("bg-black");
+  }
 });
 
 function cleanPhoneNumber(formattedPhone) {
   return formattedPhone.replace(/\D/g, "");
-}
-
-function isValidPhone(phone) {
-  return /^05\d{9}$/.test(phone);
 }
 
 /* ========================
@@ -94,16 +104,25 @@ function showError(message) {
   document.getElementById("phoneArea").classList.add("hidden");
 }
 
-function showSuccess() {
-  document.getElementById("status").innerHTML =
-    `<p class="text-green-600 font-semibold">Ziyaret başarıyla kaydedildi ✅</p>`;
-  document.getElementById("phoneArea").classList.add("hidden");
-}
-
 function showPhoneInput() {
   document.getElementById("status").innerHTML =
     `<p class="text-sm text-gray-500">Telefon numaranızı girin</p>`;
   document.getElementById("phoneArea").classList.remove("hidden");
+}
+
+function showSuccessAndClose() {
+  document.getElementById("status").innerHTML =
+    `<div class="text-green-600 space-y-2">
+        <p class="font-semibold text-lg">Teşekkür ederiz ☕</p>
+        <p class="text-sm">Ziyaretiniz başarıyla kaydedildi.</p>
+     </div>`;
+
+  document.getElementById("phoneArea").classList.add("hidden");
+
+  setTimeout(() => {
+    window.close(); // tarayıcı izin vermezse aşağıdaki çalışır
+    window.location.href = "about:blank";
+  }, 3000);
 }
 
 async function init() {
@@ -154,11 +173,6 @@ async function completeVisit(phoneOverride = null, silent = false) {
 
   phone = cleanPhoneNumber(phone);
 
-  if (!isValidPhone(phone)) {
-    showError("Lütfen 05XX XXX XXXX formatında geçerli bir telefon numarası girin.");
-    return;
-  }
-
   const businessId = tokenData.business_id;
   const band = tokenData.spending_band;
 
@@ -186,7 +200,6 @@ async function completeVisit(phoneOverride = null, silent = false) {
     customerId = customer.id;
   }
 
-  // Günlük limit kontrolü
   const todayStart = new Date();
   todayStart.setHours(0,0,0,0);
 
@@ -208,22 +221,17 @@ async function completeVisit(phoneOverride = null, silent = false) {
       .delete()
       .eq("token", tokenValue);
 
-    showError("Bugün zaten ziyaret kaydınız bulunmaktadır. Günlük ziyaret kaydı limiti 1 ile sınırlıdır. Anlayışınız için teşekkür ederiz.");
+    showError("Bugün zaten ziyaret kaydınız bulunmaktadır. Günlük ziyaret kaydı limiti 1 ile sınırlıdır.");
     return;
   }
 
-  const { error } = await supabaseClient
+  await supabaseClient
     .from("visits")
     .insert({
       business_id: businessId,
       customer_id: customerId,
       spending_band: band
     });
-
-  if (error) {
-    showError("Ziyaret kaydedilemedi.");
-    return;
-  }
 
   await supabaseClient
     .from("qr_tokens")
@@ -235,7 +243,7 @@ async function completeVisit(phoneOverride = null, silent = false) {
     phone
   );
 
-  showSuccess();
+  showSuccessAndClose();
 }
 
 init();
