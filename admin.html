@@ -7,12 +7,12 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- MODÜLLER -->
   <script src="/js/supabase.js"></script>
   <script src="/js/kpi.js"></script>
   <script src="/js/segment.js"></script>
   <script src="/js/band.js"></script>
   <script src="/js/trend.js"></script>
+  <script src="/js/businessView.js"></script>
 
 </head>
 <body class="bg-gray-100 p-10">
@@ -41,7 +41,9 @@
 
   const container = document.getElementById("businessList");
 
-  businesses.forEach(b => {
+  for (let b of businesses) {
+
+    const prefix = b.id + "_";
 
     const card = document.createElement("div");
     card.className = "bg-white p-6 rounded-xl shadow";
@@ -49,65 +51,28 @@
     card.innerHTML = `
       <div class="flex justify-between items-center cursor-pointer"
            onclick="toggleDetails('${b.id}')">
-        <h2 class="text-lg font-semibold">${b.name}</h2>
+
+        <div>
+          <h2 class="text-lg font-semibold">${b.name}</h2>
+          <div class="flex space-x-6 text-sm text-gray-600 mt-1">
+            <span id="${prefix}customers30">0</span>
+            <span id="${prefix}visits30">0</span>
+            <span id="${prefix}repeat30">0%</span>
+          </div>
+        </div>
+
         <span class="text-sm text-gray-500">Detay ▼</span>
-      </div>
-
-      <div id="details_${b.id}" class="hidden mt-6 space-y-8">
-
-        <!-- KPI -->
-        <div class="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p class="text-xs text-gray-500">Aktif Müşteri</p>
-            <p id="${b.id}_customers30" class="font-bold">0</p>
-            <p id="${b.id}_customersChange" class="text-xs"></p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Ziyaret</p>
-            <p id="${b.id}_visits30" class="font-bold">0</p>
-            <p id="${b.id}_visitsChange" class="text-xs"></p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Tekrar Oranı</p>
-            <p id="${b.id}_repeat30" class="font-bold">0%</p>
-            <p id="${b.id}_repeatChange" class="text-xs"></p>
-          </div>
-        </div>
-
-        <!-- Segment -->
-        <div class="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p class="text-xs text-gray-500">Yeni (7g)</p>
-            <p id="${b.id}_segmentNew7" class="font-bold">0</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Gelişen (7g)</p>
-            <p id="${b.id}_segmentGrow7" class="font-bold">0</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">Sadık (7g)</p>
-            <p id="${b.id}_segmentLoyal7" class="font-bold">0</p>
-          </div>
-        </div>
-
-        <!-- Band -->
-        <div>
-          <h3 class="font-semibold mb-2">Harcama Bandı (30g)</h3>
-          <div id="${b.id}_band30"></div>
-        </div>
-
-        <!-- Trend -->
-        <div>
-          <h3 class="font-semibold mb-2">30 Gün Trend</h3>
-          <canvas id="${b.id}_trend30"></canvas>
-        </div>
 
       </div>
+
+      <div id="details_${b.id}" class="hidden mt-6"></div>
     `;
 
     container.appendChild(card);
 
-  });
+    // Mini KPI yükle
+    await loadKPIs(b.id, prefix);
+  }
 
 })();
 
@@ -122,12 +87,11 @@ async function toggleDetails(businessId){
 
   el.classList.remove("hidden");
 
-  // Modüler fonksiyonları çağırıyoruz
-  await loadKPIs(businessId, businessId + "_");
-  await loadSegments(businessId, 7, businessId + "_");
-  await loadBand(businessId, 30, businessId + "_band30");
-  await loadTrend30(businessId, businessId + "_trend30");
-
+  await renderBusinessView(
+    "details_" + businessId,
+    businessId,
+    businessId + "_"
+  );
 }
 
 </script>
