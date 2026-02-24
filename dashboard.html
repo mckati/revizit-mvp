@@ -8,16 +8,62 @@
 </head>
 <body class="bg-gray-100 p-10">
 
-<div class="max-w-6xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-7xl mx-auto bg-white p-8 rounded-xl shadow">
 
   <div class="flex justify-between items-center mb-8">
     <h1 class="text-2xl font-bold">İşletme Paneli</h1>
     <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
   </div>
 
-  <!-- Günlük Trend -->
+  <!-- KPI -->
+  <div class="grid grid-cols-3 gap-4 mb-10 text-center">
+    <div class="bg-gray-50 p-4 rounded">
+      <p class="text-xs text-gray-500">Toplam Müşteri</p>
+      <p id="totalCustomers" class="text-xl font-bold">0</p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded">
+      <p class="text-xs text-gray-500">Toplam Ziyaret</p>
+      <p id="totalVisits" class="text-xl font-bold">0</p>
+    </div>
+    <div class="bg-gray-50 p-4 rounded">
+      <p class="text-xs text-gray-500">Tekrar Oranı</p>
+      <p id="repeatRate" class="text-xl font-bold">0%</p>
+    </div>
+  </div>
+
+  <!-- Segment -->
+  <h2 class="text-lg font-semibold mb-4">Son 7 Gün Segmentasyonu</h2>
+  <div class="grid grid-cols-3 gap-4 text-center mb-10">
+    <div class="bg-green-50 p-4 rounded">
+      <p class="text-xs">Yeni (1)</p>
+      <p id="segmentNew" class="text-xl font-bold text-green-600">0</p>
+    </div>
+    <div class="bg-yellow-50 p-4 rounded">
+      <p class="text-xs">Gelişen (2-4)</p>
+      <p id="segmentGrowing" class="text-xl font-bold text-yellow-600">0</p>
+    </div>
+    <div class="bg-blue-50 p-4 rounded">
+      <p class="text-xs">Sadık (5+)</p>
+      <p id="segmentLoyal" class="text-xl font-bold text-blue-600">0</p>
+    </div>
+  </div>
+
+  <!-- Harcama Bandı -->
+  <h2 class="text-lg font-semibold mb-4">Harcama Bandı Analizi</h2>
+  <div class="grid grid-cols-2 gap-8 mb-10">
+    <div>
+      <h3 class="font-semibold mb-2">Son 7 Gün</h3>
+      <div id="band7"></div>
+    </div>
+    <div>
+      <h3 class="font-semibold mb-2">Son 30 Gün</h3>
+      <div id="band30"></div>
+    </div>
+  </div>
+
+  <!-- Trend -->
   <h2 class="text-lg font-semibold mb-4">Son 30 Gün Ziyaret Trendi</h2>
-  <canvas id="trendChart" height="100"></canvas>
+  <canvas id="trendChart" height="90"></canvas>
 
 </div>
 
@@ -41,102 +87,161 @@ async function init() {
 
   businessId = data.user.user_metadata.business_id;
 
-  loadTrend();
+  await loadKPIs();
+  await loadSegments();
+  await loadBandAnalysis(7, "band7");
+  await loadBandAnalysis(30, "band30");
+  await loadTrend();
 }
 
-async function loadTrend() {
+/* KPI */
+async function loadKPIs() {
 
-  const today = new Date();
-  const startDate = new Date();
-  startDate.setDate(today.getDate() - 30);
+  let { count: totalCustomers } = await supabaseClient
+    .from("customers")
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", businessId);
+
+  let { count: totalVisits } = await supabaseClient
+    .from("visits")
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", businessId);
+
+  let repeatRate = totalCustomers > 0
+    ? Math.max(0, Math.round((totalVisits / totalCustomers - 1) * 100))
+    : 0;
+
+  document.getElementById("totalCustomers").innerText = totalCustomers || 0;
+  document.getElementById("totalVisits").innerText = totalVisits || 0;
+  document.getElementById("repeatRate").innerText = repeatRate + "%";
+}
+
+/* Segment */
+async function loadSegments() {
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const { data: visits } = await supabaseClient
     .from("visits")
-    .select("customer_id, visit_date")
+    .select("customer_id")
     .eq("business_id", businessId)
-    .gte("visit_date", startDate.toISOString());
+    .gte("visit_date", sevenDaysAgo.toISOString());
 
-  const dailyStats = {};
-
+  const counts = {};
   visits.forEach(v => {
-
-    const date = new Date(v.visit_date).toISOString().split("T")[0];
-
-    if (!dailyStats[date]) {
-      dailyStats[date] = {
-        total: 0,
-        customers: {}
-      };
-    }
-
-    dailyStats[date].total++;
-    dailyStats[date].customers[v.customer_id] =
-      (dailyStats[date].customers[v.customer_id] || 0) + 1;
+    counts[v.customer_id] = (counts[v.customer_id] || 0) + 1;
   });
 
-  const labels = [];
-  const newCustomers = [];
-  const repeatVisits = [];
+  let newC=0, growC=0, loyalC=0;
 
-  for (let i = 30; i >= 0; i--) {
+  Object.values(counts).forEach(c => {
+    if (c === 1) newC++;
+    else if (c <= 4) growC++;
+    else loyalC++;
+  });
 
-    const d = new Date();
-    d.setDate(today.getDate() - i);
+  document.getElementById("segmentNew").innerText = newC;
+  document.getElementById("segmentGrowing").innerText = growC;
+  document.getElementById("segmentLoyal").innerText = loyalC;
+}
 
-    const key = d.toISOString().split("T")[0];
+/* Band */
+async function loadBandAnalysis(days, elementId) {
 
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+
+  const { data: visits } = await supabaseClient
+    .from("visits")
+    .select("spending_band")
+    .eq("business_id", businessId)
+    .gte("visit_date", date.toISOString());
+
+  const bandCounts = {"0-250":0,"251-500":0,"501-1000":0};
+  visits.forEach(v => bandCounts[v.spending_band]++);
+
+  const total = visits.length;
+  let html="";
+
+  for (let band in bandCounts) {
+
+    const percent = total>0 ? Math.round((bandCounts[band]/total)*100) : 0;
+
+    html+=`
+      <div class="mb-2">
+        <div class="flex justify-between text-sm">
+          <span>${band}</span>
+          <span>${percent}%</span>
+        </div>
+        <div class="w-full bg-gray-200 h-2 rounded">
+          <div class="bg-black h-2 rounded" style="width:${percent}%"></div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById(elementId).innerHTML=html;
+}
+
+/* Trend */
+async function loadTrend() {
+
+  const today=new Date();
+  const startDate=new Date();
+  startDate.setDate(today.getDate()-30);
+
+  const { data: visits } = await supabaseClient
+    .from("visits")
+    .select("customer_id,visit_date")
+    .eq("business_id",businessId)
+    .gte("visit_date",startDate.toISOString());
+
+  const daily={};
+
+  visits.forEach(v=>{
+    const d=new Date(v.visit_date).toISOString().split("T")[0];
+    if(!daily[d]) daily[d]={customers:{}};
+    daily[d].customers[v.customer_id]=(daily[d].customers[v.customer_id]||0)+1;
+  });
+
+  const labels=[], newArr=[], repeatArr=[];
+
+  for(let i=30;i>=0;i--){
+    const d=new Date();
+    d.setDate(today.getDate()-i);
+    const key=d.toISOString().split("T")[0];
     labels.push(key.slice(5));
 
-    if (dailyStats[key]) {
-
-      let newCount = 0;
-      let repeatCount = 0;
-
-      for (let c in dailyStats[key].customers) {
-        if (dailyStats[key].customers[c] === 1)
-          newCount++;
-        else
-          repeatCount++;
+    if(daily[key]){
+      let n=0,r=0;
+      for(let c in daily[key].customers){
+        if(daily[key].customers[c]===1) n++;
+        else r++;
       }
-
-      newCustomers.push(newCount);
-      repeatVisits.push(repeatCount);
-
+      newArr.push(n);
+      repeatArr.push(r);
     } else {
-      newCustomers.push(0);
-      repeatVisits.push(0);
+      newArr.push(0);
+      repeatArr.push(0);
     }
   }
 
-  new Chart(document.getElementById('trendChart'), {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Yeni Müşteri',
-          data: newCustomers,
-          borderColor: 'green'
-        },
-        {
-          label: 'Tekrar Ziyaret',
-          data: repeatVisits,
-          borderColor: 'blue'
-        }
+  new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{
+      labels:labels,
+      datasets:[
+        {label:'Yeni Müşteri',data:newArr,borderColor:'green'},
+        {label:'Tekrar Ziyaret',data:repeatArr,borderColor:'blue'}
       ]
     },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' }
-      }
-    }
+    options:{responsive:true}
   });
 }
 
-async function logout() {
+async function logout(){
   await supabaseClient.auth.signOut();
-  window.location.href = "/login.html";
+  window.location.href="/login.html";
 }
 
 init();
