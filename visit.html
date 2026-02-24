@@ -44,6 +44,24 @@ function getTokenFromURL() {
   return params.get("token");
 }
 
+function showError(message) {
+  document.getElementById("status").innerHTML =
+    `<p class="text-red-500">${message}</p>`;
+  document.getElementById("phoneArea").classList.add("hidden");
+}
+
+function showSuccess() {
+  document.getElementById("status").innerHTML =
+    `<p class="text-green-600 font-semibold">Ziyaret başarıyla kaydedildi ✅</p>`;
+  document.getElementById("phoneArea").classList.add("hidden");
+}
+
+function showPhoneInput() {
+  document.getElementById("status").innerHTML =
+    `<p class="text-sm text-gray-500">Telefon numaranızı girin</p>`;
+  document.getElementById("phoneArea").classList.remove("hidden");
+}
+
 async function init() {
 
   tokenValue = getTokenFromURL();
@@ -60,41 +78,36 @@ async function init() {
     .single();
 
   if (error || !data) {
-    showError("QR bulunamadı.");
+    showError("QR geçersiz veya daha önce kullanılmış.");
     return;
   }
 
   if (new Date(data.expires_at) < new Date()) {
-    showError("QR süresi dolmuş.");
+    showError("QR süresi dolmuş. Lütfen kasiyerden yeni QR isteyin.");
+    await supabaseClient
+      .from("qr_tokens")
+      .delete()
+      .eq("token", tokenValue);
     return;
   }
 
   tokenData = data;
 
-  // Kayıtlı müşteri var mı kontrol edilecek
-  showPhoneInput();
+  // Eğer localStorage'da bu işletme için telefon kayıtlıysa
+  const savedPhone =
+    localStorage.getItem("revizit_phone_" + data.business_id);
+
+  if (savedPhone) {
+    await completeVisit(savedPhone, true);
+  } else {
+    showPhoneInput();
+  }
 }
 
-function showPhoneInput() {
-  document.getElementById("status").innerHTML =
-    `<p class="text-sm text-gray-500">Telefon numaranızı girin</p>`;
-  document.getElementById("phoneArea").classList.remove("hidden");
-}
+async function completeVisit(phoneOverride = null, silent = false) {
 
-function showError(message) {
-  document.getElementById("status").innerHTML =
-    `<p class="text-red-500">${message}</p>`;
-}
-
-function showSuccess() {
-  document.getElementById("status").innerHTML =
-    `<p class="text-green-600 font-semibold">Ziyaret başarıyla kaydedildi ✅</p>`;
-  document.getElementById("phoneArea").classList.add("hidden");
-}
-
-async function completeVisit() {
-
-  const phone = document.getElementById("phone").value;
+  const phone =
+    phoneOverride || document.getElementById("phone").value;
 
   if (!phone) {
     showError("Telefon numarası gerekli.");
@@ -130,7 +143,7 @@ async function completeVisit() {
   }
 
   // ziyaret ekle
-  await supabaseClient
+  const { error } = await supabaseClient
     .from("visits")
     .insert({
       business_id: businessId,
@@ -138,13 +151,25 @@ async function completeVisit() {
       spending_band: band
     });
 
-  // token sil
+  if (error) {
+    showError("Ziyaret kaydedilemedi.");
+    return;
+  }
+
+  // token sil (çift kullanım engeli)
   await supabaseClient
     .from("qr_tokens")
     .delete()
     .eq("token", tokenValue);
 
-  showSuccess();
+  // telefonu localStorage'a kaydet
+  localStorage.setItem(
+    "revizit_phone_" + businessId,
+    phone
+  );
+
+  if (!silent) showSuccess();
+  else showSuccess();
 }
 
 init();
