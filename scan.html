@@ -77,13 +77,20 @@ async function init() {
   currentToken = tokenData.id;
   currentBand = tokenData.spending_band;
 
-  document.getElementById("loadingArea").classList.add("hidden");
-  document.getElementById("phoneArea").classList.remove("hidden");
+  // 🔥 Cihazda kayıtlı telefon var mı?
+  const savedPhone = localStorage.getItem("revizit_phone");
+
+  if (savedPhone) {
+    completeVisit(savedPhone);
+  } else {
+    document.getElementById("loadingArea").classList.add("hidden");
+    document.getElementById("phoneArea").classList.remove("hidden");
+  }
 }
 
-async function completeVisit() {
+async function completeVisit(phoneFromStorage = null) {
 
-  const phone = document.getElementById("phoneInput").value;
+  const phone = phoneFromStorage || document.getElementById("phoneInput").value;
   if (!phone) return;
 
   let { data: existingCustomer } = await supabaseClient
@@ -125,6 +132,10 @@ async function completeVisit() {
     .update({ used: true })
     .eq("id", currentToken);
 
+  // 🔥 Telefonu cihazda sakla
+  localStorage.setItem("revizit_phone", phone);
+
+  document.getElementById("loadingArea").classList.add("hidden");
   document.getElementById("phoneArea").classList.add("hidden");
   document.getElementById("successArea").classList.remove("hidden");
 }
