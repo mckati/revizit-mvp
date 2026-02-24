@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit MVP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 p-10">
+
+  <div class="max-w-xl mx-auto bg-white p-6 rounded-xl shadow">
+    <h1 class="text-2xl font-bold mb-6">Revizit - Pilot Kafe</h1>
+
+    <input id="phone"
+      placeholder="Müşteri Telefonu"
+      class="border p-2 w-full rounded mb-4"/>
+
+    <button onclick="addVisit()"
+      class="bg-black text-white px-4 py-2 rounded w-full">
+      Ziyaret Ekle
+    </button>
+
+    <div class="mt-6">
+      <p id="result" class="text-sm text-gray-600"></p>
+    </div>
+  </div>
+
+<script>
+  const supabaseClient = supabase.createClient(
+    'SUPABASE_URL',
+    'SUPABASE_ANON_KEY'
+  );
+
+  const businessId = 'BURAYA_BUSINESS_ID';
+
+  async function addVisit() {
+    const phone = document.getElementById("phone").value;
+
+    if (!phone) return;
+
+    // 1️⃣ müşteri var mı kontrol et
+    let { data: existingCustomer } = await supabaseClient
+      .from("customers")
+      .select("*")
+      .eq("phone", phone)
+      .eq("business_id", businessId)
+      .single();
+
+    let customerId;
+
+    if (!existingCustomer) {
+      // yoksa oluştur
+      let { data: newCustomer } = await supabaseClient
+        .from("customers")
+        .insert({
+          phone: phone,
+          business_id: businessId
+        })
+        .select()
+        .single();
+
+      customerId = newCustomer.id;
+    } else {
+      customerId = existingCustomer.id;
+    }
+
+    // 2️⃣ ziyaret ekle
+    await supabaseClient
+      .from("visits")
+      .insert({
+        business_id: businessId,
+        customer_id: customerId
+      });
+
+    document.getElementById("result").innerText =
+      "Ziyaret kaydedildi.";
+
+    document.getElementById("phone").value = "";
+  }
+</script>
+
+</body>
+</html>
