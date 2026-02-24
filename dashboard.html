@@ -8,81 +8,110 @@
 </head>
 <body class="bg-gray-100 p-10">
 
-<div class="max-w-7xl mx-auto bg-white p-8 rounded-xl shadow">
+<div class="max-w-7xl mx-auto bg-white p-8 rounded-xl shadow space-y-12">
 
-  <div class="flex justify-between items-center mb-8">
+  <div class="flex justify-between items-center">
     <h1 class="text-2xl font-bold">İşletme Paneli</h1>
     <button onclick="logout()" class="text-sm text-red-500">Çıkış</button>
   </div>
 
   <!-- KPI -->
-  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Performansı</h2>
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Son 30 Gün Performansı</h2>
 
-  <div class="grid grid-cols-3 gap-4 mb-3 text-center">
+    <div class="grid grid-cols-3 gap-4 text-center">
 
-    <div class="bg-gray-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Aktif Müşteri (30g)</p>
-      <p id="customers30" class="text-xl font-bold">0</p>
-      <p id="customersChange" class="text-xs mt-1"></p>
+      <div class="bg-gray-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Aktif Müşteri (30g)</p>
+        <p id="customers30" class="text-xl font-bold">0</p>
+        <p id="customersChange" class="text-xs mt-1"></p>
+      </div>
+
+      <div class="bg-gray-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Ziyaret (30g)</p>
+        <p id="visits30" class="text-xl font-bold">0</p>
+        <p id="visitsChange" class="text-xs mt-1"></p>
+      </div>
+
+      <div class="bg-gray-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Tekrar Oranı (30g)</p>
+        <p id="repeat30" class="text-xl font-bold">0%</p>
+        <p id="repeatChange" class="text-xs mt-1"></p>
+      </div>
+
     </div>
 
-    <div class="bg-gray-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Ziyaret (30g)</p>
-      <p id="visits30" class="text-xl font-bold">0</p>
-      <p id="visitsChange" class="text-xs mt-1"></p>
-    </div>
-
-    <div class="bg-gray-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Tekrar Oranı (30g)</p>
-      <p id="repeat30" class="text-xl font-bold">0%</p>
-      <p id="repeatChange" class="text-xs mt-1"></p>
-    </div>
-
+    <p class="text-xs text-gray-400 mt-3">
+      Tüm Zamanlar:
+      <span id="allCustomers">0</span> müşteri •
+      <span id="allVisits">0</span> ziyaret
+    </p>
   </div>
 
-  <p class="text-xs text-gray-400 mb-10">
-    Tüm Zamanlar:
-    <span id="allCustomers">0</span> müşteri •
-    <span id="allVisits">0</span> ziyaret
-  </p>
-
   <!-- SEGMENT 7 -->
-  <h2 class="text-lg font-semibold mb-4">Son 7 Gün Segmentasyonu</h2>
-  <div class="grid grid-cols-3 gap-4 text-center mb-8">
-    <div class="bg-green-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Yeni (1 ziyaret)</p>
-      <p id="segmentNew7" class="text-xl font-bold text-green-600">0</p>
-    </div>
-    <div class="bg-yellow-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Gelişen (2–4 ziyaret)</p>
-      <p id="segmentGrow7" class="text-xl font-bold text-yellow-600">0</p>
-    </div>
-    <div class="bg-blue-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Sadık (5+ ziyaret)</p>
-      <p id="segmentLoyal7" class="text-xl font-bold text-blue-600">0</p>
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Son 7 Gün Segmentasyonu</h2>
+    <div class="grid grid-cols-3 gap-4 text-center">
+      <div class="bg-green-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Yeni (1 ziyaret)</p>
+        <p id="segmentNew7" class="text-xl font-bold text-green-600">0</p>
+      </div>
+      <div class="bg-yellow-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Gelişen (2–4 ziyaret)</p>
+        <p id="segmentGrow7" class="text-xl font-bold text-yellow-600">0</p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Sadık (5+ ziyaret)</p>
+        <p id="segmentLoyal7" class="text-xl font-bold text-blue-600">0</p>
+      </div>
     </div>
   </div>
 
   <!-- SEGMENT 30 -->
-  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Segmentasyonu</h2>
-  <div class="grid grid-cols-3 gap-4 text-center mb-10">
-    <div class="bg-green-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Yeni (1 ziyaret)</p>
-      <p id="segmentNew30" class="text-xl font-bold text-green-600">0</p>
-    </div>
-    <div class="bg-yellow-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Gelişen (2–4 ziyaret)</p>
-      <p id="segmentGrow30" class="text-xl font-bold text-yellow-600">0</p>
-    </div>
-    <div class="bg-blue-50 p-4 rounded">
-      <p class="text-xs text-gray-500">Sadık (5+ ziyaret)</p>
-      <p id="segmentLoyal30" class="text-xl font-bold text-blue-600">0</p>
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Son 30 Gün Segmentasyonu</h2>
+    <div class="grid grid-cols-3 gap-4 text-center">
+      <div class="bg-green-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Yeni (1 ziyaret)</p>
+        <p id="segmentNew30" class="text-xl font-bold text-green-600">0</p>
+      </div>
+      <div class="bg-yellow-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Gelişen (2–4 ziyaret)</p>
+        <p id="segmentGrow30" class="text-xl font-bold text-yellow-600">0</p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded">
+        <p class="text-xs text-gray-500">Sadık (5+ ziyaret)</p>
+        <p id="segmentLoyal30" class="text-xl font-bold text-blue-600">0</p>
+      </div>
     </div>
   </div>
 
-  <!-- TREND -->
-  <h2 class="text-lg font-semibold mb-4">Son 30 Gün Günlük Trend</h2>
-  <canvas id="trend30" height="90"></canvas>
+  <!-- BAND -->
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Harcama Bandı Analizi</h2>
+    <div class="grid grid-cols-2 gap-8">
+      <div>
+        <h3 class="font-semibold mb-2">Son 7 Gün</h3>
+        <div id="band7"></div>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Son 30 Gün</h3>
+        <div id="band30"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREND 30 -->
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Son 30 Gün Günlük Trend</h2>
+    <canvas id="trend30" height="90"></canvas>
+  </div>
+
+  <!-- TREND 7 HOURLY -->
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Son 7 Gün Saatlik Yoğunluk</h2>
+    <canvas id="trend7hour" height="90"></canvas>
+  </div>
 
 </div>
 
@@ -102,14 +131,14 @@ async function init(){
     return;
   }
   businessId=data.user.user_metadata.business_id;
-  await loadAll();
-}
 
-async function loadAll(){
   await loadKPIs();
   await loadSegments(7);
   await loadSegments(30);
+  await loadBand(7,"band7");
+  await loadBand(30,"band30");
   await loadTrend30();
+  await loadHourly7();
 }
 
 function calcChange(current,previous){
@@ -166,13 +195,14 @@ async function loadKPIs(){
     .select("*",{count:"exact",head:true})
     .eq("business_id",businessId);
 
-  allCustomers && (document.getElementById("allCustomers").innerText=allCustomers);
-  allVisits && (document.getElementById("allVisits").innerText=allVisits);
+  document.getElementById("allCustomers").innerText=allCustomers||0;
+  document.getElementById("allVisits").innerText=allVisits||0;
 }
 
 async function loadSegments(days){
 
-  const date=new Date(); date.setDate(date.getDate()-days);
+  const date=new Date();
+  date.setDate(date.getDate()-days);
 
   const { data } = await supabaseClient
     .from("visits")
@@ -201,6 +231,39 @@ async function loadSegments(days){
   }
 }
 
+async function loadBand(days,id){
+
+  const date=new Date();
+  date.setDate(date.getDate()-days);
+
+  const { data } = await supabaseClient
+    .from("visits")
+    .select("spending_band")
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
+
+  const bands={"0-250":0,"251-500":0,"501-1000":0};
+  data.forEach(v=>bands[v.spending_band]++);
+
+  const total=data.length;
+  let html="";
+
+  for(let b in bands){
+    const p=total>0?Math.round((bands[b]/total)*100):0;
+    html+=`
+      <div class="mb-2">
+        <div class="flex justify-between text-sm">
+          <span>${b}</span><span>${p}%</span>
+        </div>
+        <div class="w-full bg-gray-200 h-2 rounded">
+          <div class="bg-black h-2 rounded" style="width:${p}%"></div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById(id).innerHTML=html;
+}
+
 async function loadTrend30(){
 
   const today=new Date();
@@ -226,10 +289,37 @@ async function loadTrend30(){
     values.push(daily[key]||0);
   }
 
-  new Chart(trend30,{
+  new Chart(document.getElementById("trend30"),{
     type:"line",
     data:{labels:labels,
     datasets:[{label:"Toplam Ziyaret",data:values,borderColor:"black"}]},
+    options:{responsive:true}
+  });
+}
+
+async function loadHourly7(){
+
+  const date=new Date();
+  date.setDate(date.getDate()-7);
+
+  const { data } = await supabaseClient
+    .from("visits")
+    .select("visit_date")
+    .eq("business_id",businessId)
+    .gte("visit_date",date.toISOString());
+
+  const hours=Array(24).fill(0);
+  data.forEach(v=>{
+    const h=new Date(v.visit_date).getHours();
+    hours[h]++;
+  });
+
+  new Chart(document.getElementById("trend7hour"),{
+    type:"bar",
+    data:{
+      labels:Array.from({length:24},(_,i)=>i+":00"),
+      datasets:[{label:"Ziyaret",data:hours,backgroundColor:"black"}]
+    },
     options:{responsive:true}
   });
 }
@@ -242,6 +332,5 @@ async function logout(){
 init();
 
 </script>
-
 </body>
 </html>
