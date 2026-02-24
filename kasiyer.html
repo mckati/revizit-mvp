@@ -10,9 +10,18 @@
 
 <div class="bg-white p-8 rounded-xl shadow w-96 text-center">
 
-  <h1 class="text-xl font-bold mb-6">Ziyaret Başlat</h1>
+  <h1 class="text-xl font-bold mb-6">Kasiyer Paneli</h1>
 
-  <div id="bandSelection">
+  <!-- 1️⃣ Ziyaret Başlat Butonu -->
+  <div id="startArea">
+    <button onclick="showBands()" 
+      class="w-full bg-black text-white p-3 rounded">
+      Ziyaret Başlat
+    </button>
+  </div>
+
+  <!-- 2️⃣ Harcama Bantları -->
+  <div id="bandArea" class="hidden mt-4">
     <p class="mb-4 text-sm text-gray-600">Harcama Bandı Seç</p>
 
     <button onclick="startVisit('0-250')" class="w-full mb-2 bg-gray-200 p-2 rounded">
@@ -28,7 +37,8 @@
     </button>
   </div>
 
-  <div id="qrArea" class="hidden">
+  <!-- 3️⃣ QR Alanı -->
+  <div id="qrArea" class="hidden mt-6">
     <canvas id="qrcode"></canvas>
     <p class="mt-4 text-sm text-red-500">
       15 saniye geçerli
@@ -46,12 +56,17 @@ const supabaseClient = supabase.createClient(
 
 const businessId = 'c95e305c-adde-4dd5-8cc9-40f8c51bbc74';
 
+// Ziyaret başlatınca bantları göster
+function showBands() {
+  document.getElementById("startArea").classList.add("hidden");
+  document.getElementById("bandArea").classList.remove("hidden");
+}
+
 async function startVisit(band) {
 
   const expiresAt = new Date(Date.now() + 15000).toISOString();
 
-  // Token oluştur
-  const { data: tokenData } = await supabaseClient
+  const { data: tokenData, error } = await supabaseClient
     .from("visit_tokens")
     .insert({
       business_id: businessId,
@@ -61,21 +76,35 @@ async function startVisit(band) {
     .select()
     .single();
 
+  if (error) {
+    alert("Token oluşturulamadı");
+    console.log(error);
+    return;
+  }
+
   const tokenId = tokenData.id;
 
   const qrUrl = window.location.origin + "/scan.html?token=" + tokenId;
 
-  document.getElementById("bandSelection").classList.add("hidden");
+  document.getElementById("bandArea").classList.add("hidden");
   document.getElementById("qrArea").classList.remove("hidden");
 
   QRCode.toCanvas(document.getElementById('qrcode'), qrUrl);
 
-  // 15 saniye sonra QR sil
+  // 15 saniye sonra reset
   setTimeout(() => {
-    document.getElementById("qrArea").classList.add("hidden");
-    document.getElementById("bandSelection").classList.remove("hidden");
-    document.getElementById("qrcode").getContext("2d").clearRect(0,0,300,300);
+    resetScreen();
   }, 15000);
+}
+
+function resetScreen() {
+  document.getElementById("qrArea").classList.add("hidden");
+  document.getElementById("bandArea").classList.add("hidden");
+  document.getElementById("startArea").classList.remove("hidden");
+
+  const canvas = document.getElementById("qrcode");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 </script>
