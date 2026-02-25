@@ -11,7 +11,6 @@
 <body class="bg-neutral-100 p-6">
 
 <h1 class="text-2xl font-semibold mb-6 text-center">Hesabım</h1>
-
 <div id="content" class="space-y-6"></div>
 
 <script>
@@ -28,9 +27,7 @@ init();
 
 async function init(){
 
-  // Eğer global phone yok ama customer_id varsa fallback yap
   if(!phone && customerId){
-
     const {data:customer} = await supabaseClient
       .from("customers")
       .select("phone")
@@ -66,7 +63,6 @@ async function loadData(){
     return;
   }
 
-  // Son ziyaret tarihine göre sırala
   for(const c of customers){
     const {data:visit} = await supabaseClient
       .from("visits")
@@ -131,25 +127,6 @@ async function loadData(){
       `;
     }
 
-    const {data:history} = await supabaseClient
-      .from("rewards_history")
-      .select("*")
-      .eq("customer_id", customer.id)
-      .order("redeemed_at",{ascending:false});
-
-    if(history && history.length > 0){
-      html += `<div class="text-sm text-left mt-4 border-t pt-3">`;
-      history.forEach(item=>{
-        html += `
-          <div>
-            ${item.reward_type} - 
-            ${new Date(item.redeemed_at).toLocaleDateString()}
-          </div>
-        `;
-      });
-      html += `</div>`;
-    }
-
     html += `</div>`;
   }
 
@@ -158,7 +135,7 @@ async function loadData(){
 
 async function requestReward(customerId,businessId){
 
-  await supabaseClient
+  const {error} = await supabaseClient
     .from("reward_redeem_requests")
     .insert({
       business_id:businessId,
@@ -166,6 +143,10 @@ async function requestReward(customerId,businessId){
       reward_type:"second_coffee_free",
       status:"pending"
     });
+
+  if(error){
+    alert("Zaten aktif bir ödül talebiniz var.");
+  }
 }
 
 </script>
