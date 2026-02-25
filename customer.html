@@ -17,62 +17,85 @@
 <script>
 
 const SUPABASE_URL="https://hyqlhnraoumjsxaxefez.supabase.co";
-const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub0YiLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
 
-const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+const supabaseClient = supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
-const phone=localStorage.getItem("revizit_global_phone");
+let phone = localStorage.getItem("revizit_global_phone");
+const customerId = localStorage.getItem("customer_id");
 
-if(!phone){
-  document.getElementById("content").innerHTML=
-    "<p class='text-center'>Müşteri bulunamadı.</p>";
-}else{
+init();
+
+async function init(){
+
+  // Eğer global phone yok ama customer_id varsa fallback yap
+  if(!phone && customerId){
+
+    const {data:customer} = await supabaseClient
+      .from("customers")
+      .select("phone")
+      .eq("id",customerId)
+      .single();
+
+    if(customer){
+      phone = customer.phone;
+      localStorage.setItem("revizit_global_phone", phone);
+    }
+  }
+
+  if(!phone){
+    document.getElementById("content").innerHTML =
+      "<p class='text-center'>Müşteri bulunamadı.</p>";
+    return;
+  }
+
   loadData();
-  setInterval(loadData,3000); // 3 saniyede bir kontrol
+  setInterval(loadData,3000);
 }
 
 async function loadData(){
 
-  const {data:customers}=await supabaseClient
+  const {data:customers} = await supabaseClient
     .from("customers")
     .select("*")
-    .eq("phone",phone);
+    .eq("phone", phone);
 
-  if(!customers || customers.length===0){
-    document.getElementById("content").innerHTML=
+  if(!customers || customers.length === 0){
+    document.getElementById("content").innerHTML =
       "<p class='text-center'>Kayıt bulunamadı.</p>";
     return;
   }
 
+  // Son ziyaret tarihine göre sırala
   for(const c of customers){
-    const {data:visit}=await supabaseClient
+    const {data:visit} = await supabaseClient
       .from("visits")
       .select("created_at")
-      .eq("customer_id",c.id)
+      .eq("customer_id", c.id)
       .order("created_at",{ascending:false})
       .limit(1)
       .single();
 
-    c.last_visit=visit ? visit.created_at : null;
+    c.last_visit = visit ? visit.created_at : null;
   }
 
   customers.sort((a,b)=>{
-    return new Date(b.last_visit||0) - new Date(a.last_visit||0);
+    return new Date(b.last_visit || 0) - new Date(a.last_visit || 0);
   });
 
-  let html="";
+  let html = "";
 
   for(const customer of customers){
 
-    const {data:business}=await supabaseClient
+    const {data:business} = await supabaseClient
       .from("businesses")
       .select("name")
-      .eq("id",customer.business_id)
+      .eq("id", customer.business_id)
       .single();
 
-    let fillPercent=(customer.reward_progress/4)*100;
+    let fillPercent = (customer.reward_progress/4)*100;
 
-    html+=`
+    html += `
       <div class="bg-white rounded-3xl shadow-xl p-6 text-center space-y-4">
 
         <h2 class="text-lg font-semibold">📍 ${business.name}</h2>
@@ -99,7 +122,7 @@ async function loadData(){
     `;
 
     if(customer.reward_available){
-      html+=`
+      html += `
         <button
           onclick="requestReward('${customer.id}','${customer.business_id}')"
           class="bg-green-600 text-white w-full py-2 rounded-xl">
@@ -108,29 +131,29 @@ async function loadData(){
       `;
     }
 
-    const {data:history}=await supabaseClient
+    const {data:history} = await supabaseClient
       .from("rewards_history")
       .select("*")
-      .eq("customer_id",customer.id)
+      .eq("customer_id", customer.id)
       .order("redeemed_at",{ascending:false});
 
-    if(history && history.length>0){
-      html+=`<div class="text-sm text-left mt-4 border-t pt-3">`;
+    if(history && history.length > 0){
+      html += `<div class="text-sm text-left mt-4 border-t pt-3">`;
       history.forEach(item=>{
-        html+=`
+        html += `
           <div>
             ${item.reward_type} - 
             ${new Date(item.redeemed_at).toLocaleDateString()}
           </div>
         `;
       });
-      html+=`</div>`;
+      html += `</div>`;
     }
 
-    html+=`</div>`;
+    html += `</div>`;
   }
 
-  document.getElementById("content").innerHTML=html;
+  document.getElementById("content").innerHTML = html;
 }
 
 async function requestReward(customerId,businessId){
