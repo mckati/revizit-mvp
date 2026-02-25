@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Revizit - Hesabım</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -61,8 +62,12 @@ async function loadCustomer(){
 
   if(customer.reward_available){
     html+=`
-      <div class="bg-green-100 p-3 rounded">
-        🎉 Ödül Kazandınız!
+      <div class="bg-green-100 p-3 rounded text-center space-y-3">
+        <div>🎉 Ödül Kazandınız!</div>
+        <button onclick="requestReward()"
+          class="bg-black text-white px-4 py-2 rounded w-full">
+          Ödül Kullan
+        </button>
       </div>
     `;
   }
@@ -80,7 +85,7 @@ async function loadCustomer(){
       <h2 class="font-bold mb-3">Geçmiş Ödüller</h2>
   `;
 
-  if(history.length===0){
+  if(!history || history.length===0){
     html+="<p>Henüz ödül kullanmadınız.</p>";
   }else{
     history.forEach(item=>{
@@ -96,6 +101,26 @@ async function loadCustomer(){
   html+="</div>";
 
   document.getElementById("content").innerHTML=html;
+}
+
+async function requestReward(){
+
+  const {data:customer}=await supabaseClient
+    .from("customers")
+    .select("business_id")
+    .eq("id",customerId)
+    .single();
+
+  await supabaseClient
+    .from("reward_redeem_requests")
+    .insert({
+      business_id:customer.business_id,
+      customer_id:customerId,
+      reward_type:"second_coffee_free",
+      status:"pending"
+    });
+
+  alert("Talep gönderildi. Kasiyer onayını bekleyin.");
 }
 
 function maskPhone(phone){
