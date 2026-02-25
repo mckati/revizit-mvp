@@ -37,17 +37,13 @@
     <div class="relative w-48 mx-auto mb-4">
 
       <svg viewBox="0 0 200 200" class="w-full">
-
         <path d="M40 50 L160 50 L150 150 L50 150 Z"
               fill="#E5E5E5" stroke="#CFCFCF" stroke-width="3"/>
-
         <path d="M160 70 Q190 100 160 130"
               fill="none" stroke="#CFCFCF" stroke-width="8"/>
-
         <clipPath id="cupClip">
           <path d="M40 50 L160 50 L150 150 L50 150 Z"/>
         </clipPath>
-
         <rect id="coffeeFill"
               x="0"
               y="150"
@@ -55,8 +51,8 @@
               height="100"
               fill="#4B2E2B"
               clip-path="url(#cupClip)"/>
-
       </svg>
+
     </div>
 
     <p id="visitText" class="text-lg font-medium mb-1"></p>
@@ -118,15 +114,21 @@ async function init(){
 
   tokenData=data;
 
-  document.getElementById("phoneArea").classList.remove("hidden");
+  const savedPhone=localStorage.getItem("revizit_phone_"+data.business_id);
+
+  if(savedPhone){
+    completeVisit(savedPhone);
+  } else {
+    document.getElementById("phoneArea").classList.remove("hidden");
+  }
 }
 
-async function completeVisit(){
+async function completeVisit(phoneOverride=null){
 
-  const phone=cleanPhone(phoneInput.value);
+  const phone=phoneOverride || cleanPhone(phoneInput.value);
   const businessId=tokenData.business_id;
 
-  const {data:customers}=await supabaseClient
+  let {data:customers}=await supabaseClient
     .from("customers")
     .select("*")
     .eq("business_id",businessId)
@@ -173,6 +175,7 @@ async function completeVisit(){
   }
 
   localStorage.setItem("customer_id",customer.id);
+  localStorage.setItem("revizit_phone_"+businessId,phone);
 
   await supabaseClient.from("visits").insert({
     business_id:businessId,
