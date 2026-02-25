@@ -23,6 +23,12 @@
 
 </div>
 
+<!-- TOAST -->
+<div id="appToast"
+     class="hidden fixed top-6 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-xl text-sm shadow-lg z-50">
+  Uygulama modundasın ☕
+</div>
+
 <h1 class="text-2xl font-semibold mb-6 text-center">Hesabım</h1>
 <div id="content" class="space-y-6"></div>
 
@@ -37,10 +43,20 @@ let phone = localStorage.getItem("revizit_global_phone");
 const customerId = localStorage.getItem("customer_id");
 let deferredPrompt=null;
 
+const isStandalone =
+  window.matchMedia('(display-mode: standalone)').matches ||
+  window.navigator.standalone === true;
+
+if(isStandalone){
+  showAppToast();
+}
+
 window.addEventListener("beforeinstallprompt",(e)=>{
   e.preventDefault();
   deferredPrompt=e;
-  showTopInstallBanner();
+  if(!isStandalone){
+    showTopInstallBanner();
+  }
 });
 
 if("serviceWorker" in navigator){
@@ -91,6 +107,14 @@ function showTopInstallBanner(){
     }
     deferredPrompt=null;
   };
+}
+
+function showAppToast(){
+  const toast=document.getElementById("appToast");
+  toast.classList.remove("hidden");
+  setTimeout(()=>{
+    toast.classList.add("hidden");
+  },1500);
 }
 
 async function loadData(){
