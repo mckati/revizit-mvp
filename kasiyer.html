@@ -87,7 +87,7 @@ let activeToken=null;
 let pollInterval=null;
 let countdownInterval=null;
 
-/* ----------------- MEVCUT ZİYARET SİSTEMİ ----------------- */
+/* ----------------- ZİYARET SİSTEMİ ----------------- */
 
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
@@ -186,26 +186,20 @@ function resetScreen(){
   }
 }
 
-/* ----------------- GÜVENLİ REDEEM SİSTEMİ ----------------- */
+/* ----------------- STABİL REDEEM SİSTEMİ ----------------- */
 
 let currentRedeem=null;
-let popupOpen=false;
 let processing=false;
+let lastShownRequestId=null;
 
 function maskPhone(phone){
-
   const digits=phone.replace(/\D/g,'');
-
   if(digits.length<4) return phone;
-
   const last4=digits.slice(-4);
-
   return "05XX XXX "+last4;
 }
 
 async function checkRedeemRequests(){
-
-  if(popupOpen) return;
 
   const {data}=await supabaseClient
     .from("reward_redeem_requests")
@@ -216,14 +210,19 @@ async function checkRedeemRequests(){
     .limit(1);
 
   if(data && data.length>0){
-    showRedeemPopup(data[0]);
+
+    const request=data[0];
+
+    if(request.id===lastShownRequestId) return;
+
+    showRedeemPopup(request);
   }
 }
 
 async function showRedeemPopup(request){
 
-  popupOpen=true;
   currentRedeem=request;
+  lastShownRequestId=request.id;
 
   const {data:customer}=await supabaseClient
     .from("customers")
@@ -279,7 +278,6 @@ async function rejectRedeem(){
 function closePopup(){
   document.getElementById("redeemPopup").style.display="none";
   currentRedeem=null;
-  popupOpen=false;
   processing=false;
 }
 
