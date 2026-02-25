@@ -20,46 +20,27 @@
   </div>
 
   <div id="bandArea" class="hidden space-y-2">
-    <p class="text-sm text-gray-500">Harcama Bandı Seç</p>
-
     <button onclick="createQR('0-250')" class="w-full border p-2 rounded">0-250</button>
     <button onclick="createQR('251-500')" class="w-full border p-2 rounded">251-500</button>
     <button onclick="createQR('501-1000')" class="w-full border p-2 rounded">501-1000</button>
     <button onclick="createQR('1001+')" class="w-full border p-2 rounded">1001+</button>
   </div>
 
-  <!-- QR ALANI -->
   <div id="qrArea" class="hidden space-y-4">
-
-    <div id="qrCode" class="flex justify-center items-center"></div>
-
-    <div>
-      <div class="w-full bg-gray-200 h-2 rounded">
-        <div id="progressBar"
-             class="bg-black h-2 rounded"
-             style="width:100%"></div>
-      </div>
-      <p id="countdown" class="text-sm mt-1">15</p>
-    </div>
-
+    <div id="qrCode" class="flex justify-center"></div>
   </div>
-
-  <p id="debug" class="text-red-500 text-xs"></p>
 
 </div>
 
 <script>
 
-const SUPABASE_URL = "https://hyqlhnraoumjsxaxefez.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
-const BUSINESS_ID = "c95e305c-adde-4dd5-8cc9-40f8c51bbc74";
+const SUPABASE_URL="https://hyqlhnraoumjsxaxefez.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
+const BUSINESS_ID="c95e305c-adde-4dd5-8cc9-40f8c51bbc74";
 
-const supabaseClient = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON
-);
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
-let countdownInterval;
+let channel;
 
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
@@ -68,74 +49,43 @@ function showBands(){
 
 async function createQR(band){
 
-  document.getElementById("debug").innerText = "";
+  const token=crypto.randomUUID();
 
-  try {
+  await supabaseClient.from("qr_tokens").insert({
+    token,
+    business_id:BUSINESS_ID,
+    spending_band:band,
+    expires_at:new Date(Date.now()+15000)
+  });
 
-    const token = crypto.randomUUID();
+  document.getElementById("bandArea").classList.add("hidden");
+  document.getElementById("qrArea").classList.remove("hidden");
 
-    const { error } = await supabaseClient
-      .from("qr_tokens")
-      .insert({
-        token: token,
-        business_id: BUSINESS_ID,
-        spending_band: band,
-        expires_at: new Date(Date.now() + 15000)
-      });
+  const url=window.location.origin+"/visit.html?token="+token;
 
-    if (error) {
-      document.getElementById("debug").innerText =
-        "DB Hatası: " + error.message;
-      return;
-    }
+  document.getElementById("qrCode").innerHTML=
+    `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" />`;
 
-    document.getElementById("bandArea").classList.add("hidden");
-    document.getElementById("qrArea").classList.remove("hidden");
-
-    const url =
-      window.location.origin +
-      "/visit.html?token=" +
-      token;
-
-    document.getElementById("qrCode").innerHTML =
-      `<img class="mx-auto" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" />`;
-
-    startCountdown();
-
-  } catch (err) {
-    document.getElementById("debug").innerText =
-      "Genel Hata: " + err.message;
-  }
-}
-
-function startCountdown(){
-
-  let timeLeft = 15;
-
-  countdownInterval = setInterval(() => {
-
-    timeLeft--;
-
-    document.getElementById("countdown").innerText = timeLeft;
-
-    const percent = (timeLeft / 15) * 100;
-    document.getElementById("progressBar").style.width = percent + "%";
-
-    if(timeLeft <= 0){
-      clearInterval(countdownInterval);
-      resetScreen();
-    }
-
-  }, 1000);
+  // REALTIME DİNLE
+  channel=supabaseClient
+    .channel("qr-watch")
+    .on("postgres_changes",
+      {event:"DELETE",schema:"public",table:"qr_tokens"},
+      payload=>{
+        if(payload.old.token===token){
+          resetScreen();
+        }
+      })
+    .subscribe();
 }
 
 function resetScreen(){
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("startArea").classList.remove("hidden");
-  document.getElementById("qrCode").innerHTML = "";
+  document.getElementById("qrCode").innerHTML="";
+  if(channel) supabaseClient.removeChannel(channel);
 }
 
 </script>
-
 </body>
 </html>
