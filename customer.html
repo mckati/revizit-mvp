@@ -4,10 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="manifest" href="/manifest.json">
-
-<!-- Status bar rengi -->
 <meta name="theme-color" content="#000000">
-
 <title>Revizit - Hesabım</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -15,17 +12,23 @@
 
 <body class="bg-neutral-100 p-6">
 
+<!-- INSTALL BANNER (Chrome) -->
 <div id="installTopBanner"
      class="hidden bg-black text-white text-sm p-3 rounded-xl mb-4 flex justify-between items-center">
-
   <span>Revizit’i ana ekrana ekle ☕</span>
   <button id="installTopBtn"
           class="bg-white text-black px-3 py-1 rounded-lg text-xs">
     Ekle
   </button>
-
 </div>
 
+<!-- FALLBACK BANNER (Diğer Tarayıcılar) -->
+<div id="manualInstallBanner"
+     class="hidden bg-gray-800 text-white text-sm p-3 rounded-xl mb-4">
+  Tarayıcı menüsünden <b>“Ana Ekrana Ekle”</b> seçeneğini kullanabilirsiniz ☕
+</div>
+
+<!-- TOAST -->
 <div id="appToast"
      class="hidden fixed top-6 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-xl text-sm shadow-lg z-50">
   Uygulama modundasın ☕
@@ -44,6 +47,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 let phone = localStorage.getItem("revizit_global_phone");
 const customerId = localStorage.getItem("customer_id");
 let deferredPrompt=null;
+let installEventFired=false;
 
 const isStandalone =
   window.matchMedia('(display-mode: standalone)').matches ||
@@ -58,13 +62,17 @@ if(isStandalone){
 window.addEventListener("beforeinstallprompt",(e)=>{
   e.preventDefault();
   deferredPrompt=e;
-  if(!isStandalone){
+  installEventFired=true;
+
+  if(!isStandalone && !localStorage.getItem("revizit_installed")){
     showTopInstallBanner();
   }
 });
 
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("/service-worker.js");
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("/service-worker.js");
+  });
 }
 
 init();
@@ -86,18 +94,22 @@ async function init(){
 
   if(!phone){
     document.getElementById("content").innerHTML =
-      "<p class='text-center text-white'>Müşteri bulunamadı.</p>";
+      "<p class='text-center'>Müşteri bulunamadı.</p>";
     return;
   }
 
   loadData();
   setInterval(loadData,3000);
+
+  // 5 saniye içinde install event gelmezse fallback göster
+  setTimeout(()=>{
+    if(!installEventFired && !isStandalone && !localStorage.getItem("revizit_installed")){
+      document.getElementById("manualInstallBanner").classList.remove("hidden");
+    }
+  },5000);
 }
 
 function showTopInstallBanner(){
-
-  if(!deferredPrompt) return;
-  if(localStorage.getItem("revizit_installed")) return;
 
   const banner=document.getElementById("installTopBanner");
   banner.classList.remove("hidden");
@@ -130,7 +142,7 @@ async function loadData(){
 
   if(!customers || customers.length === 0){
     document.getElementById("content").innerHTML =
-      "<p class='text-center text-white'>Kayıt bulunamadı.</p>";
+      "<p class='text-center'>Kayıt bulunamadı.</p>";
     return;
   }
 
