@@ -1,72 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Revizit - Ziyaret Onayı</title>
+  <title>Revizit - Ziyaret</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-<div class="bg-white p-8 rounded-2xl shadow-xl w-96 text-center space-y-6">
+<div class="bg-white p-8 rounded-xl shadow w-96 text-center space-y-6">
 
   <h1 class="text-xl font-bold">Ziyaret Onayı</h1>
 
-  <div id="phoneArea" class="space-y-3">
+  <div id="phoneArea" class="hidden space-y-3">
     <input id="phone"
       placeholder="05XX XXX XXXX"
       maxlength="13"
       inputmode="numeric"
-      class="border p-2 w-full rounded text-center text-lg tracking-wider"/>
+      class="border p-2 w-full rounded text-center"/>
     <button id="confirmBtn"
       onclick="completeVisit()"
       disabled
-      class="bg-gray-300 text-white px-4 py-2 rounded w-full cursor-not-allowed">
+      class="bg-gray-300 text-white px-4 py-2 rounded w-full">
       Onayla
     </button>
   </div>
 
-  <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
+  <div id="progressArea" class="hidden space-y-4">
 
-    <div class="relative w-48 h-72">
-
-      <svg viewBox="0 0 200 320" class="w-full h-full">
-
-        <defs>
-          <clipPath id="cupClip">
-            <path d="M50 40 L150 40 L130 300 L70 300 Z" />
-          </clipPath>
-
-          <linearGradient id="coffeeGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#c2410c"/>
-            <stop offset="100%" stop-color="#7c2d12"/>
-          </linearGradient>
-        </defs>
-
-        <!-- Bardak -->
-        <path d="M50 40 L150 40 L130 300 L70 300 Z"
-              fill="#ffffff"
-              stroke="#d1d5db"
-              stroke-width="6"/>
-
-        <!-- Seviye Çizgileri -->
-        <line x1="70" y1="235" x2="130" y2="235" stroke="#d1d5db" stroke-width="2"/>
-        <line x1="70" y1="200" x2="130" y2="200" stroke="#d1d5db" stroke-width="2"/>
-        <line x1="70" y1="165" x2="130" y2="165" stroke="#d1d5db" stroke-width="2"/>
-
-        <!-- Kahve -->
-        <rect id="coffeeFill"
-              x="0"
-              y="300"
-              width="200"
-              height="0"
-              fill="url(#coffeeGrad)"
-              clip-path="url(#cupClip)"/>
-      </svg>
+    <div class="grid grid-cols-4 gap-2">
+      <div id="p1" class="h-4 rounded bg-gray-200"></div>
+      <div id="p2" class="h-4 rounded bg-gray-200"></div>
+      <div id="p3" class="h-4 rounded bg-gray-200"></div>
+      <div id="p4" class="h-4 rounded bg-gray-200"></div>
     </div>
 
-    <div id="rewardMessage" class="text-sm font-medium"></div>
+    <div id="message" class="text-sm font-medium"></div>
+
   </div>
 
 </div>
@@ -78,6 +48,7 @@ const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let tokenData=null;
+let tokenValue=null;
 
 const phoneInput=document.getElementById("phone");
 const confirmBtn=document.getElementById("confirmBtn");
@@ -95,7 +66,7 @@ phoneInput.addEventListener("input",function(e){
 
   confirmBtn.disabled=!/^05\d{9}$/.test(digits);
   if(!confirmBtn.disabled){
-    confirmBtn.classList.remove("bg-gray-300","cursor-not-allowed");
+    confirmBtn.classList.remove("bg-gray-300");
     confirmBtn.classList.add("bg-black");
   }
 });
@@ -104,21 +75,27 @@ function cleanPhone(v){ return v.replace(/\D/g,""); }
 
 async function init(){
 
-  const token=new URLSearchParams(window.location.search).get("token");
+  tokenValue=new URLSearchParams(window.location.search).get("token");
 
-  const {data}=await supabaseClient
+  const {data,error}=await supabaseClient
     .from("qr_tokens")
     .select("*")
-    .eq("token",token)
+    .eq("token",tokenValue)
     .single();
+
+  if(error || !data){
+    document.body.innerHTML="QR geçersiz.";
+    return;
+  }
 
   tokenData=data;
 
-  // 🔥 CİHAZDA DAHA ÖNCE KAYITLI TELEFON VAR MI?
   const savedPhone=localStorage.getItem("revizit_phone_"+data.business_id);
 
   if(savedPhone){
     completeVisit(savedPhone,true);
+  } else {
+    document.getElementById("phoneArea").classList.remove("hidden");
   }
 }
 
@@ -127,7 +104,7 @@ async function completeVisit(phoneOverride=null,auto=false){
   const phone=phoneOverride || cleanPhone(phoneInput.value);
   const businessId=tokenData.business_id;
 
-  let {data:customers}=await supabaseClient
+  const {data:customers}=await supabaseClient
     .from("customers")
     .select("*")
     .eq("business_id",businessId)
@@ -141,19 +118,16 @@ async function completeVisit(phoneOverride=null,auto=false){
 
   if(!customer){
 
-    const {data:newCustomer}=await supabaseClient
-      .from("customers")
-      .insert({
-        phone,
-        business_id:businessId,
-        reward_available:true,
-        reward_progress:4
-      })
-      .select();
+    await supabaseClient.from("customers").insert({
+      phone,
+      business_id:businessId,
+      reward_available:true,
+      reward_progress:4
+    });
 
     progress=4;
     reward=true;
-    message="🎉 Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
+    message="Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
   }
   else{
 
@@ -168,7 +142,7 @@ async function completeVisit(phoneOverride=null,auto=false){
         })
         .eq("id",customer.id);
 
-      message="☕ Hediyenizi kullandınız!";
+      message="Hediyenizi kullandınız!";
     }
     else{
 
@@ -186,7 +160,7 @@ async function completeVisit(phoneOverride=null,auto=false){
           })
           .eq("id",customer.id);
 
-        message="🎉 Yeni ödül kazandınız!";
+        message="Yeni ödül kazandınız!";
       }
       else{
         await supabaseClient
@@ -201,45 +175,37 @@ async function completeVisit(phoneOverride=null,auto=false){
     }
   }
 
+  // ZİYARETİ KAYDET
+  await supabaseClient.from("visits").insert({
+    business_id:businessId,
+    customer_phone:phone
+  });
+
+  // TOKENI SİL (yenilemede tekrar işlem yapmasın)
   await supabaseClient
-    .from("visits")
-    .insert({
-      business_id:businessId,
-      customer_phone:phone
-    });
+    .from("qr_tokens")
+    .delete()
+    .eq("token",tokenValue);
 
   localStorage.setItem("revizit_phone_"+businessId,phone);
 
-  animateCup(progress,reward,message);
+  showProgress(progress,message);
 }
 
-function animateCup(level,celebrate,message){
+function showProgress(level,message){
 
   document.getElementById("phoneArea").classList.add("hidden");
-  document.getElementById("cupArea").classList.remove("hidden");
+  document.getElementById("progressArea").classList.remove("hidden");
 
-  const rect=document.getElementById("coffeeFill");
-
-  const cupHeight=260; // 40-300 arası iç yükseklik
-  const targetHeight=(level/4)*cupHeight;
-
-  let current=0;
-
-  const interval=setInterval(()=>{
-    current+=5;
-    rect.setAttribute("y",300-current);
-    rect.setAttribute("height",current);
-
-    if(current>=targetHeight){
-      clearInterval(interval);
+  for(let i=1;i<=4;i++){
+    const el=document.getElementById("p"+i);
+    if(i<=level){
+      el.classList.remove("bg-gray-200");
+      el.classList.add("bg-black");
     }
-  },16);
-
-  if(celebrate){
-    confetti({particleCount:60,spread:60,origin:{y:0.6}});
   }
 
-  document.getElementById("rewardMessage").innerHTML=message;
+  document.getElementById("message").innerText=message;
 }
 
 init();
