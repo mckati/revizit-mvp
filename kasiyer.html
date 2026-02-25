@@ -30,7 +30,6 @@
 
     <div id="qrCode" class="flex justify-center"></div>
 
-    <!-- Geri Sayım -->
     <div>
       <div class="w-full bg-gray-200 h-2 rounded">
         <div id="progressBar"
@@ -40,6 +39,40 @@
       <p id="countdown" class="text-sm mt-1">15</p>
     </div>
 
+  </div>
+
+</div>
+
+<!-- REDEEM POPUP -->
+<div id="redeemPopup" style="
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.6);
+justify-content:center;
+align-items:center;
+z-index:9999;
+">
+
+  <div class="bg-white p-6 rounded-xl shadow w-80 text-center space-y-4">
+    <h3 class="font-bold text-lg">Ödül Kullanım Talebi</h3>
+    <p id="redeemCustomer"></p>
+    <p id="redeemReward"></p>
+
+    <div class="flex justify-center gap-3 mt-4">
+      <button onclick="approveRedeem()"
+        class="bg-black text-white px-4 py-2 rounded">
+        Onayla
+      </button>
+
+      <button onclick="rejectRedeem()"
+        class="border px-4 py-2 rounded">
+        İptal
+      </button>
+    </div>
   </div>
 
 </div>
@@ -55,6 +88,8 @@ const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 let activeToken=null;
 let pollInterval=null;
 let countdownInterval=null;
+
+/* ----------------- MEVCUT ZİYARET SİSTEMİ (DEĞİŞMEDİ) ----------------- */
 
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
@@ -152,6 +187,72 @@ function resetScreen(){
     countdownInterval=null;
   }
 }
+
+/* ----------------- REDEEM SİSTEMİ (YENİ EKLENDİ) ----------------- */
+
+let currentRedeem=null;
+
+async function checkRedeemRequests(){
+
+  const {data}=await supabaseClient
+    .from("reward_redeem_requests")
+    .select("*")
+    .eq("business_id",BUSINESS_ID)
+    .eq("status","pending")
+    .order("created_at",{ascending:false})
+    .limit(1);
+
+  if(data && data.length>0){
+    showRedeemPopup(data[0]);
+  }
+}
+
+async function showRedeemPopup(request){
+
+  currentRedeem=request;
+
+  const {data:customer}=await supabaseClient
+    .from("customers")
+    .select("phone")
+    .eq("id",request.customer_id)
+    .single();
+
+  document.getElementById("redeemCustomer").innerText=
+    "Müşteri: "+customer.phone;
+
+  document.getElementById("redeemReward").innerText=
+    "Ödül: "+request.reward_type;
+
+  document.getElementById("redeemPopup").style.display="flex";
+}
+
+async function approveRedeem(){
+
+  await supabaseClient
+    .from("reward_redeem_requests")
+    .update({status:"approved"})
+    .eq("id",currentRedeem.id);
+
+  await supabaseClient.rpc("redeem_reward",{
+    customer_uuid:currentRedeem.customer_id,
+    business_uuid:BUSINESS_ID,
+    visit_uuid:crypto.randomUUID()
+  });
+
+  document.getElementById("redeemPopup").style.display="none";
+}
+
+async function rejectRedeem(){
+
+  await supabaseClient
+    .from("reward_redeem_requests")
+    .update({status:"rejected"})
+    .eq("id",currentRedeem.id);
+
+  document.getElementById("redeemPopup").style.display="none";
+}
+
+setInterval(checkRedeemRequests,3000);
 
 </script>
 </body>
