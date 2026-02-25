@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="manifest" href="/manifest.json">
 <title>Revizit - Ziyaret</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -70,10 +71,20 @@ const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let tokenData=null;
 let tokenValue=null;
+let deferredPrompt=null;
 
 const phoneInput=document.getElementById("phone");
 const confirmBtn=document.getElementById("confirmBtn");
 const coffee=document.getElementById("coffeeFill");
+
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+});
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("/service-worker.js");
+}
 
 phoneInput.addEventListener("input",function(e){
   let digits=e.target.value.replace(/\D/g,"");
@@ -85,7 +96,6 @@ phoneInput.addEventListener("input",function(e){
   if(digits.length>=8) formatted+=" "+digits.substring(7,11);
 
   e.target.value=formatted;
-
   confirmBtn.disabled=!/^05\d{9}$/.test(digits);
 
   if(!confirmBtn.disabled){
@@ -113,7 +123,6 @@ async function init(){
 
   tokenData=data;
 
-  // BUSINESS NAME
   const {data:business}=await supabaseClient
     .from("businesses")
     .select("name")
@@ -231,8 +240,47 @@ function showCup(visits){
   }
 
   setTimeout(()=>{
+    showInstallBanner();
+  },1200);
+
+  setTimeout(()=>{
     window.location.href="customer.html";
   },3000);
+}
+
+function showInstallBanner(){
+
+  if(!deferredPrompt) return;
+  if(localStorage.getItem("revizit_installed")) return;
+
+  const banner=document.createElement("div");
+  banner.className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white shadow-xl rounded-2xl p-4 w-80 text-center space-y-3 z-50";
+
+  banner.innerHTML=`
+    <div class="font-semibold">Revizit'i Ana Ekrana Ekle ☕</div>
+    <button id="installBtn" class="bg-black text-white w-full py-2 rounded-xl">
+      Ana Ekrana Ekle
+    </button>
+    <button id="laterBtn" class="text-sm text-gray-500">
+      Daha Sonra
+    </button>
+  `;
+
+  document.body.appendChild(banner);
+
+  document.getElementById("installBtn").onclick=async()=>{
+    banner.remove();
+    deferredPrompt.prompt();
+    const {outcome}=await deferredPrompt.userChoice;
+    if(outcome==="accepted"){
+      localStorage.setItem("revizit_installed","true");
+    }
+    deferredPrompt=null;
+  };
+
+  document.getElementById("laterBtn").onclick=()=>{
+    banner.remove();
+  };
 }
 
 init();
