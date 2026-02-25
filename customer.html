@@ -17,7 +17,7 @@
 <script>
 
 const SUPABASE_URL="https://hyqlhnraoumjsxaxefez.supabase.co";
-const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub0YiLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
 
 const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
@@ -28,6 +28,7 @@ if(!phone){
     "<p class='text-center'>Müşteri bulunamadı.</p>";
 }else{
   loadData();
+  setInterval(loadData,3000); // 3 saniyede bir kontrol
 }
 
 async function loadData(){
@@ -42,6 +43,22 @@ async function loadData(){
       "<p class='text-center'>Kayıt bulunamadı.</p>";
     return;
   }
+
+  for(const c of customers){
+    const {data:visit}=await supabaseClient
+      .from("visits")
+      .select("created_at")
+      .eq("customer_id",c.id)
+      .order("created_at",{ascending:false})
+      .limit(1)
+      .single();
+
+    c.last_visit=visit ? visit.created_at : null;
+  }
+
+  customers.sort((a,b)=>{
+    return new Date(b.last_visit||0) - new Date(a.last_visit||0);
+  });
 
   let html="";
 
@@ -61,7 +78,6 @@ async function loadData(){
         <h2 class="text-lg font-semibold">📍 ${business.name}</h2>
 
         <div class="relative w-40 mx-auto">
-
           <svg viewBox="0 0 200 200" class="w-full">
             <path d="M40 50 L160 50 L150 150 L50 150 Z"
                   fill="#E5E5E5" stroke="#CFCFCF" stroke-width="3"/>
@@ -77,7 +93,6 @@ async function loadData(){
                   fill="#4B2E2B"
                   clip-path="url(#cupClip${customer.id})"/>
           </svg>
-
         </div>
 
         <p>${customer.reward_progress} / 4 Ziyaret</p>
@@ -85,7 +100,8 @@ async function loadData(){
 
     if(customer.reward_available){
       html+=`
-        <button onclick="requestReward('${customer.id}','${customer.business_id}')"
+        <button
+          onclick="requestReward('${customer.id}','${customer.business_id}')"
           class="bg-green-600 text-white w-full py-2 rounded-xl">
           Ödülünü Kullan
         </button>
@@ -127,8 +143,6 @@ async function requestReward(customerId,businessId){
       reward_type:"second_coffee_free",
       status:"pending"
     });
-
-  alert("Talep gönderildi. Kasiyer onayını bekleyin.");
 }
 
 </script>
