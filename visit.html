@@ -1,48 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-  <title>Revizit - Ziyaret</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Revizit - Ziyaret</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="bg-neutral-100 flex items-center justify-center min-h-screen">
 
-<div class="bg-white w-[95%] max-w-md min-h-[85vh] 
-            rounded-2xl shadow-xl 
-            p-8 flex flex-col justify-center 
-            text-center space-y-8">
+<div class="bg-white w-[360px] rounded-3xl shadow-xl p-6 text-center space-y-6">
 
-  <h1 class="text-2xl font-bold">Ziyaret Onayı</h1>
+  <h1 class="text-2xl font-semibold">Ziyaret Onayı</h1>
 
-  <div id="phoneArea" class="hidden space-y-6">
+  <div id="phoneArea" class="hidden space-y-4">
 
     <input id="phone"
       placeholder="05XX XXX XXXX"
       maxlength="13"
       inputmode="numeric"
-      class="border p-4 w-full rounded-xl text-center text-xl"/>
+      class="border p-4 w-full rounded-xl text-center text-lg"/>
 
     <button id="confirmBtn"
       onclick="completeVisit()"
       disabled
-      class="bg-gray-300 text-white px-4 py-4 rounded-xl text-lg w-full">
+      class="bg-gray-300 text-white px-4 py-3 rounded-xl w-full">
       Onayla
     </button>
 
   </div>
 
-  <div id="progressArea" class="hidden space-y-8">
+  <div id="cupArea" class="hidden">
 
-    <div class="grid grid-cols-4 gap-3">
-      <div id="p1" class="h-6 rounded-lg bg-gray-200"></div>
-      <div id="p2" class="h-6 rounded-lg bg-gray-200"></div>
-      <div id="p3" class="h-6 rounded-lg bg-gray-200"></div>
-      <div id="p4" class="h-6 rounded-lg bg-gray-200"></div>
+    <div class="relative w-48 mx-auto mb-4">
+
+      <svg viewBox="0 0 200 200" class="w-full">
+
+        <path d="M40 50 L160 50 L150 150 L50 150 Z"
+              fill="#E5E5E5" stroke="#CFCFCF" stroke-width="3"/>
+
+        <path d="M160 70 Q190 100 160 130"
+              fill="none" stroke="#CFCFCF" stroke-width="8"/>
+
+        <clipPath id="cupClip">
+          <path d="M40 50 L160 50 L150 150 L50 150 Z"/>
+        </clipPath>
+
+        <rect id="coffeeFill"
+              x="0"
+              y="150"
+              width="200"
+              height="100"
+              fill="#4B2E2B"
+              clip-path="url(#cupClip)"/>
+
+      </svg>
     </div>
 
-    <div id="message" class="text-lg font-semibold"></div>
+    <p id="visitText" class="text-lg font-medium mb-1"></p>
+    <p id="message" class="text-green-700 font-medium"></p>
 
   </div>
 
@@ -52,6 +70,7 @@
 
 const SUPABASE_URL="https://hyqlhnraoumjsxaxefez.supabase.co";
 const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
+
 const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let tokenData=null;
@@ -59,6 +78,7 @@ let tokenValue=null;
 
 const phoneInput=document.getElementById("phone");
 const confirmBtn=document.getElementById("confirmBtn");
+const coffee=document.getElementById("coffeeFill");
 
 phoneInput.addEventListener("input",function(e){
   let digits=e.target.value.replace(/\D/g,"");
@@ -98,18 +118,12 @@ async function init(){
 
   tokenData=data;
 
-  const savedPhone=localStorage.getItem("revizit_phone_"+data.business_id);
-
-  if(savedPhone){
-    completeVisit(savedPhone,true);
-  } else {
-    document.getElementById("phoneArea").classList.remove("hidden");
-  }
+  document.getElementById("phoneArea").classList.remove("hidden");
 }
 
-async function completeVisit(phoneOverride=null){
+async function completeVisit(){
 
-  const phone=phoneOverride || cleanPhone(phoneInput.value);
+  const phone=cleanPhone(phoneInput.value);
   const businessId=tokenData.business_id;
 
   const {data:customers}=await supabaseClient
@@ -121,48 +135,24 @@ async function completeVisit(phoneOverride=null){
   let customer=customers.length>0 ? customers[0] : null;
 
   if(!customer){
-
     const {data:newCustomer}=await supabaseClient
       .from("customers")
       .insert({
         phone,
         business_id:businessId,
-        reward_available:true,
-        reward_progress:4
+        reward_available:false,
+        reward_progress:1
       })
       .select()
       .single();
 
     customer=newCustomer;
-  }
+  }else{
 
-  // CUSTOMER ID'Yİ KAYDET
-  localStorage.setItem("customer_id",customer.id);
-
-  let progress=0;
-  let message="";
-
-  if(customer.reward_available){
-
-    progress=1;
-
-    await supabaseClient
-      .from("customers")
-      .update({
-        reward_available:false,
-        reward_progress:1
-      })
-      .eq("id",customer.id);
-
-    message="Hediyenizi kullandınız!";
-  }
-  else{
-
-    progress=customer.reward_progress+1;
+    let progress=customer.reward_progress+1;
 
     if(progress>=4){
       progress=4;
-
       await supabaseClient
         .from("customers")
         .update({
@@ -170,20 +160,19 @@ async function completeVisit(phoneOverride=null){
           reward_progress:4
         })
         .eq("id",customer.id);
-
-      message="Yeni ödül kazandınız!";
-    }
-    else{
+    }else{
       await supabaseClient
         .from("customers")
         .update({
           reward_progress:progress
         })
         .eq("id",customer.id);
-
-      message=progress+"/4 tamamlandı";
     }
+
+    customer.reward_progress=progress;
   }
+
+  localStorage.setItem("customer_id",customer.id);
 
   await supabaseClient.from("visits").insert({
     business_id:businessId,
@@ -195,29 +184,51 @@ async function completeVisit(phoneOverride=null){
     .delete()
     .eq("token",tokenValue);
 
-  localStorage.setItem("revizit_phone_"+businessId,phone);
-
-  showProgress(progress,message);
+  showCup(customer.reward_progress);
 }
 
-function showProgress(level,message){
+function showCup(visits){
 
   document.getElementById("phoneArea").classList.add("hidden");
-  document.getElementById("progressArea").classList.remove("hidden");
+  document.getElementById("cupArea").classList.remove("hidden");
 
-  for(let i=1;i<=4;i++){
-    const el=document.getElementById("p"+i);
-    if(i<=level){
-      el.classList.remove("bg-gray-200");
-      el.classList.add("bg-black");
+  let fillPercent=(visits/4)*100;
+  let currentY=150;
+  let targetY=150-fillPercent;
+
+  let animation=setInterval(()=>{
+    currentY-=2;
+    coffee.setAttribute("y",currentY);
+    if(currentY<=targetY){
+      clearInterval(animation);
     }
+  },10);
+
+  document.getElementById("visitText").innerText=
+    visits+" / 4 Ziyaret";
+
+  if(visits===4){
+    document.getElementById("message").innerText=
+      "Yeni ödül kazandınız! 🎉";
+
+    confetti({
+      particleCount:120,
+      spread:70,
+      origin:{y:0.6}
+    });
+  }else{
+    document.getElementById("message").innerText=
+      "Bir adım daha yaklaştınız ☕";
   }
 
-  document.getElementById("message").innerText=message;
+  setTimeout(()=>{
+    window.location.href="customer.html";
+  },3000);
 }
 
 init();
 
 </script>
+
 </body>
 </html>
