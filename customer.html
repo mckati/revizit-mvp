@@ -3,12 +3,25 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="manifest" href="/manifest.json">
 <title>Revizit - Hesabım</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="bg-neutral-100 p-6">
+
+<!-- INSTALL BANNER -->
+<div id="installTopBanner"
+     class="hidden bg-black text-white text-sm p-3 rounded-xl mb-4 flex justify-between items-center">
+
+  <span>Revizit’i ana ekrana ekle ☕</span>
+  <button id="installTopBtn"
+          class="bg-white text-black px-3 py-1 rounded-lg text-xs">
+    Ekle
+  </button>
+
+</div>
 
 <h1 class="text-2xl font-semibold mb-6 text-center">Hesabım</h1>
 <div id="content" class="space-y-6"></div>
@@ -22,6 +35,17 @@ const supabaseClient = supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let phone = localStorage.getItem("revizit_global_phone");
 const customerId = localStorage.getItem("customer_id");
+let deferredPrompt=null;
+
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  showTopInstallBanner();
+});
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("/service-worker.js");
+}
 
 init();
 
@@ -48,6 +72,25 @@ async function init(){
 
   loadData();
   setInterval(loadData,3000);
+}
+
+function showTopInstallBanner(){
+
+  if(!deferredPrompt) return;
+  if(localStorage.getItem("revizit_installed")) return;
+
+  const banner=document.getElementById("installTopBanner");
+  banner.classList.remove("hidden");
+
+  document.getElementById("installTopBtn").onclick=async()=>{
+    deferredPrompt.prompt();
+    const {outcome}=await deferredPrompt.userChoice;
+    if(outcome==="accepted"){
+      localStorage.setItem("revizit_installed","true");
+      banner.classList.add("hidden");
+    }
+    deferredPrompt=null;
+  };
 }
 
 async function loadData(){
