@@ -2,40 +2,49 @@
 <html>
 <head>
   <title>Revizit - Ziyaret</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-<div class="bg-white p-8 rounded-xl shadow w-96 text-center space-y-6">
+<div class="bg-white w-[95%] max-w-md min-h-[85vh] 
+            rounded-2xl shadow-xl 
+            p-8 flex flex-col justify-center 
+            text-center space-y-8">
 
-  <h1 class="text-xl font-bold">Ziyaret Onayı</h1>
+  <h1 class="text-2xl font-bold">Ziyaret Onayı</h1>
 
-  <div id="phoneArea" class="hidden space-y-3">
+  <!-- TELEFON -->
+  <div id="phoneArea" class="hidden space-y-6">
+
     <input id="phone"
       placeholder="05XX XXX XXXX"
       maxlength="13"
       inputmode="numeric"
-      class="border p-2 w-full rounded text-center"/>
+      class="border p-4 w-full rounded-xl text-center text-xl"/>
+
     <button id="confirmBtn"
       onclick="completeVisit()"
       disabled
-      class="bg-gray-300 text-white px-4 py-2 rounded w-full">
+      class="bg-gray-300 text-white px-4 py-4 rounded-xl text-lg w-full">
       Onayla
     </button>
+
   </div>
 
-  <div id="progressArea" class="hidden space-y-4">
+  <!-- PROGRESS -->
+  <div id="progressArea" class="hidden space-y-8">
 
-    <div class="grid grid-cols-4 gap-2">
-      <div id="p1" class="h-4 rounded bg-gray-200"></div>
-      <div id="p2" class="h-4 rounded bg-gray-200"></div>
-      <div id="p3" class="h-4 rounded bg-gray-200"></div>
-      <div id="p4" class="h-4 rounded bg-gray-200"></div>
+    <div class="grid grid-cols-4 gap-3">
+      <div id="p1" class="h-6 rounded-lg bg-gray-200"></div>
+      <div id="p2" class="h-6 rounded-lg bg-gray-200"></div>
+      <div id="p3" class="h-6 rounded-lg bg-gray-200"></div>
+      <div id="p4" class="h-6 rounded-lg bg-gray-200"></div>
     </div>
 
-    <div id="message" class="text-sm font-medium"></div>
+    <div id="message" class="text-lg font-semibold"></div>
 
   </div>
 
@@ -65,6 +74,7 @@ phoneInput.addEventListener("input",function(e){
   e.target.value=formatted;
 
   confirmBtn.disabled=!/^05\d{9}$/.test(digits);
+
   if(!confirmBtn.disabled){
     confirmBtn.classList.remove("bg-gray-300");
     confirmBtn.classList.add("bg-black");
@@ -99,7 +109,7 @@ async function init(){
   }
 }
 
-async function completeVisit(phoneOverride=null,auto=false){
+async function completeVisit(phoneOverride=null){
 
   const phone=phoneOverride || cleanPhone(phoneInput.value);
   const businessId=tokenData.business_id;
@@ -113,7 +123,6 @@ async function completeVisit(phoneOverride=null,auto=false){
   let customer=customers.length>0 ? customers[0] : null;
 
   let progress=0;
-  let reward=false;
   let message="";
 
   if(!customer){
@@ -126,12 +135,12 @@ async function completeVisit(phoneOverride=null,auto=false){
     });
 
     progress=4;
-    reward=true;
     message="Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
   }
   else{
 
     if(customer.reward_available){
+
       progress=1;
 
       await supabaseClient
@@ -149,7 +158,6 @@ async function completeVisit(phoneOverride=null,auto=false){
       progress=customer.reward_progress+1;
 
       if(progress>=4){
-        reward=true;
         progress=4;
 
         await supabaseClient
@@ -175,13 +183,11 @@ async function completeVisit(phoneOverride=null,auto=false){
     }
   }
 
-  // ZİYARETİ KAYDET
   await supabaseClient.from("visits").insert({
     business_id:businessId,
     customer_phone:phone
   });
 
-  // TOKENI SİL (yenilemede tekrar işlem yapmasın)
   await supabaseClient
     .from("qr_tokens")
     .delete()
