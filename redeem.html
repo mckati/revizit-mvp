@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit Redeem</title>
+</head>
+<body>
+
+<h2>Kasiyer Paneli</h2>
+<div id="popup" style="display:none; border:1px solid black; padding:20px;">
+  <p id="customerInfo"></p>
+  <p id="rewardInfo"></p>
+  <button onclick="approve()">Onayla</button>
+  <button onclick="reject()">İptal Et</button>
+</div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+const supabase = createClient(
+  "https://hyqlhnraoumjsxaxefez.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U"
+);
+
+// URL’den business_id al
+const urlParams = new URLSearchParams(window.location.search);
+const businessId = urlParams.get("business");
+
+let currentRequest = null;
+
+async function checkRequests() {
+
+  const { data } = await supabase
+    .from("reward_redeem_requests")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (data && data.length > 0) {
+
+    currentRequest = data[0];
+
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("phone")
+      .eq("id", currentRequest.customer_id)
+      .single();
+
+    document.getElementById("customerInfo").innerText =
+      "Müşteri: " + customer.phone;
+
+    document.getElementById("rewardInfo").innerText =
+      "Ödül: " + currentRequest.reward_type;
+
+    document.getElementById("popup").style.display = "block";
+  }
+}
+
+window.approve = async function() {
+
+  await supabase
+    .from("reward_redeem_requests")
+    .update({ status: "approved" })
+    .eq("id", currentRequest.id);
+
+  await supabase.rpc("redeem_reward", {
+    customer_uuid: currentRequest.customer_id,
+    business_uuid: businessId,
+    visit_uuid: crypto.randomUUID()
+  });
+
+  alert("Ödül Kullanıldı!");
+  document.getElementById("popup").style.display = "none";
+};
+
+window.reject = async function() {
+
+  await supabase
+    .from("reward_redeem_requests")
+    .update({ status: "rejected" })
+    .eq("id", currentRequest.id);
+
+  document.getElementById("popup").style.display = "none";
+};
+
+setInterval(checkRequests, 3000);
+
+</script>
+
+</body>
+</html>
