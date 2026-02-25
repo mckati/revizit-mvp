@@ -16,7 +16,6 @@
 
   <h1 class="text-2xl font-bold">Ziyaret Onayı</h1>
 
-  <!-- TELEFON -->
   <div id="phoneArea" class="hidden space-y-6">
 
     <input id="phone"
@@ -34,7 +33,6 @@
 
   </div>
 
-  <!-- PROGRESS -->
   <div id="progressArea" class="hidden space-y-8">
 
     <div class="grid grid-cols-4 gap-3">
@@ -122,70 +120,74 @@ async function completeVisit(phoneOverride=null){
 
   let customer=customers.length>0 ? customers[0] : null;
 
+  if(!customer){
+
+    const {data:newCustomer}=await supabaseClient
+      .from("customers")
+      .insert({
+        phone,
+        business_id:businessId,
+        reward_available:true,
+        reward_progress:4
+      })
+      .select()
+      .single();
+
+    customer=newCustomer;
+  }
+
+  // CUSTOMER ID'Yİ KAYDET
+  localStorage.setItem("customer_id",customer.id);
+
   let progress=0;
   let message="";
 
-  if(!customer){
+  if(customer.reward_available){
 
-    await supabaseClient.from("customers").insert({
-      phone,
-      business_id:businessId,
-      reward_available:true,
-      reward_progress:4
-    });
+    progress=1;
 
-    progress=4;
-    message="Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
+    await supabaseClient
+      .from("customers")
+      .update({
+        reward_available:false,
+        reward_progress:1
+      })
+      .eq("id",customer.id);
+
+    message="Hediyenizi kullandınız!";
   }
   else{
 
-    if(customer.reward_available){
+    progress=customer.reward_progress+1;
 
-      progress=1;
+    if(progress>=4){
+      progress=4;
 
       await supabaseClient
         .from("customers")
         .update({
-          reward_available:false,
-          reward_progress:1
+          reward_available:true,
+          reward_progress:4
         })
         .eq("id",customer.id);
 
-      message="Hediyenizi kullandınız!";
+      message="Yeni ödül kazandınız!";
     }
     else{
+      await supabaseClient
+        .from("customers")
+        .update({
+          reward_progress:progress
+        })
+        .eq("id",customer.id);
 
-      progress=customer.reward_progress+1;
-
-      if(progress>=4){
-        progress=4;
-
-        await supabaseClient
-          .from("customers")
-          .update({
-            reward_available:true,
-            reward_progress:4
-          })
-          .eq("id",customer.id);
-
-        message="Yeni ödül kazandınız!";
-      }
-      else{
-        await supabaseClient
-          .from("customers")
-          .update({
-            reward_progress:progress
-          })
-          .eq("id",customer.id);
-
-        message=progress+"/4 tamamlandı";
-      }
+      message=progress+"/4 tamamlandı";
     }
   }
 
   await supabaseClient.from("visits").insert({
     business_id:businessId,
-    customer_phone:phone
+    customer_id:customer.id
   });
 
   await supabaseClient
