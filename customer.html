@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="manifest" href="/manifest.json">
+
+<!-- Status bar rengi -->
+<meta name="theme-color" content="#000000">
+
 <title>Revizit - Hesabım</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -11,7 +15,6 @@
 
 <body class="bg-neutral-100 p-6">
 
-<!-- INSTALL BANNER -->
 <div id="installTopBanner"
      class="hidden bg-black text-white text-sm p-3 rounded-xl mb-4 flex justify-between items-center">
 
@@ -23,7 +26,6 @@
 
 </div>
 
-<!-- TOAST -->
 <div id="appToast"
      class="hidden fixed top-6 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-xl text-sm shadow-lg z-50">
   Uygulama modundasın ☕
@@ -48,6 +50,8 @@ const isStandalone =
   window.navigator.standalone === true;
 
 if(isStandalone){
+  document.body.classList.remove("bg-neutral-100");
+  document.body.classList.add("bg-black");
   showAppToast();
 }
 
@@ -82,7 +86,7 @@ async function init(){
 
   if(!phone){
     document.getElementById("content").innerHTML =
-      "<p class='text-center'>Müşteri bulunamadı.</p>";
+      "<p class='text-center text-white'>Müşteri bulunamadı.</p>";
     return;
   }
 
@@ -126,25 +130,9 @@ async function loadData(){
 
   if(!customers || customers.length === 0){
     document.getElementById("content").innerHTML =
-      "<p class='text-center'>Kayıt bulunamadı.</p>";
+      "<p class='text-center text-white'>Kayıt bulunamadı.</p>";
     return;
   }
-
-  for(const c of customers){
-    const {data:visit} = await supabaseClient
-      .from("visits")
-      .select("created_at")
-      .eq("customer_id", c.id)
-      .order("created_at",{ascending:false})
-      .limit(1)
-      .single();
-
-    c.last_visit = visit ? visit.created_at : null;
-  }
-
-  customers.sort((a,b)=>{
-    return new Date(b.last_visit || 0) - new Date(a.last_visit || 0);
-  });
 
   let html = "";
 
@@ -159,7 +147,7 @@ async function loadData(){
     let fillPercent = (customer.reward_progress/4)*100;
 
     html += `
-      <div class="bg-white rounded-3xl shadow-xl p-6 text-center space-y-4">
+      <div class="bg-white rounded-3xl shadow-xl p-6 text-center space-y-4 mb-6">
 
         <h2 class="text-lg font-semibold">📍 ${business.name}</h2>
 
