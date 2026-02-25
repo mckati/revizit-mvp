@@ -27,7 +27,19 @@
   </div>
 
   <div id="qrArea" class="hidden space-y-4">
+
     <div id="qrCode" class="flex justify-center"></div>
+
+    <!-- Geri Sayım -->
+    <div>
+      <div class="w-full bg-gray-200 h-2 rounded">
+        <div id="progressBar"
+             class="bg-black h-2 rounded transition-all duration-1000"
+             style="width:100%"></div>
+      </div>
+      <p id="countdown" class="text-sm mt-1">15</p>
+    </div>
+
   </div>
 
 </div>
@@ -42,6 +54,7 @@ const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let activeToken=null;
 let pollInterval=null;
+let countdownInterval=null;
 
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
@@ -68,7 +81,35 @@ async function createQR(band){
   document.getElementById("qrCode").innerHTML=
     `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" />`;
 
+  startCountdown();
   startPolling();
+}
+
+function startCountdown(){
+
+  let timeLeft=15;
+
+  document.getElementById("countdown").innerText=timeLeft;
+  document.getElementById("progressBar").style.width="100%";
+
+  if(countdownInterval){
+    clearInterval(countdownInterval);
+  }
+
+  countdownInterval=setInterval(()=>{
+
+    timeLeft--;
+
+    document.getElementById("countdown").innerText=timeLeft;
+
+    const percent=(timeLeft/15)*100;
+    document.getElementById("progressBar").style.width=percent+"%";
+
+    if(timeLeft<=0){
+      resetScreen();
+    }
+
+  },1000);
 }
 
 function startPolling(){
@@ -86,12 +127,11 @@ function startPolling(){
       .select("token")
       .eq("token",activeToken);
 
-    // Eğer token artık yoksa → reset
     if(!data || data.length===0){
       resetScreen();
     }
 
-  },1000); // her 1 saniye kontrol
+  },1000);
 }
 
 function resetScreen(){
@@ -105,6 +145,11 @@ function resetScreen(){
   if(pollInterval){
     clearInterval(pollInterval);
     pollInterval=null;
+  }
+
+  if(countdownInterval){
+    clearInterval(countdownInterval);
+    countdownInterval=null;
   }
 }
 
