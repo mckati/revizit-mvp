@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Revizit - Hesabım</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen p-6">
+
+<h1 class="text-2xl font-bold mb-6">Hesabım</h1>
+
+<div id="content" class="space-y-6"></div>
+
+<script>
+
+const SUPABASE_URL="https://hyqlhnraoumjsxaxefez.supabase.co";
+const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
+
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+const customerId=localStorage.getItem("customer_id");
+
+if(!customerId){
+  document.getElementById("content").innerHTML=
+    "<p>Müşteri bulunamadı. Lütfen tekrar QR okutun.</p>";
+}else{
+  loadCustomer();
+}
+
+async function loadCustomer(){
+
+  const {data:customer}=await supabaseClient
+    .from("customers")
+    .select("*")
+    .eq("id",customerId)
+    .single();
+
+  if(!customer){
+    document.getElementById("content").innerHTML=
+      "<p>Müşteri kaydı bulunamadı.</p>";
+    return;
+  }
+
+  const percent=(customer.reward_progress/4)*100;
+
+  let html=`
+    <div class="bg-white p-6 rounded-xl shadow space-y-4">
+      <p><strong>Telefon:</strong> ${maskPhone(customer.phone)}</p>
+
+      <div>
+        <div class="w-full bg-gray-200 h-3 rounded">
+          <div class="bg-black h-3 rounded"
+            style="width:${percent}%"></div>
+        </div>
+        <p class="text-sm mt-1">
+          ${customer.reward_progress}/4 ziyaret
+        </p>
+      </div>
+  `;
+
+  if(customer.reward_available){
+    html+=`
+      <div class="bg-green-100 p-3 rounded">
+        🎉 Ödül Kazandınız!
+      </div>
+    `;
+  }
+
+  html+=`</div>`;
+
+  const {data:history}=await supabaseClient
+    .from("rewards_history")
+    .select("*")
+    .eq("customer_id",customerId)
+    .order("redeemed_at",{ascending:false});
+
+  html+=`
+    <div class="bg-white p-6 rounded-xl shadow">
+      <h2 class="font-bold mb-3">Geçmiş Ödüller</h2>
+  `;
+
+  if(history.length===0){
+    html+="<p>Henüz ödül kullanmadınız.</p>";
+  }else{
+    history.forEach(item=>{
+      html+=`
+        <div class="border-b py-2 text-sm">
+          ${item.reward_type} - 
+          ${new Date(item.redeemed_at).toLocaleDateString()}
+        </div>
+      `;
+    });
+  }
+
+  html+="</div>";
+
+  document.getElementById("content").innerHTML=html;
+}
+
+function maskPhone(phone){
+  const digits=phone.replace(/\D/g,'');
+  if(digits.length<4) return phone;
+  const last4=digits.slice(-4);
+  return "05XX XXX "+last4;
+}
+
+</script>
+</body>
+</html>
