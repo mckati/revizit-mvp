@@ -87,8 +87,6 @@ let activeToken=null;
 let pollInterval=null;
 let countdownInterval=null;
 
-/* ----------------- ZİYARET SİSTEMİ ----------------- */
-
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
   document.getElementById("bandArea").classList.remove("hidden");
@@ -121,38 +119,24 @@ async function createQR(band){
 function startCountdown(){
 
   let timeLeft=15;
-
   document.getElementById("countdown").innerText=timeLeft;
   document.getElementById("progressBar").style.width="100%";
 
-  if(countdownInterval){
-    clearInterval(countdownInterval);
-  }
+  if(countdownInterval) clearInterval(countdownInterval);
 
   countdownInterval=setInterval(()=>{
-
     timeLeft--;
-
     document.getElementById("countdown").innerText=timeLeft;
-
-    const percent=(timeLeft/15)*100;
-    document.getElementById("progressBar").style.width=percent+"%";
-
-    if(timeLeft<=0){
-      resetScreen();
-    }
-
+    document.getElementById("progressBar").style.width=(timeLeft/15)*100+"%";
+    if(timeLeft<=0) resetScreen();
   },1000);
 }
 
 function startPolling(){
 
-  if(pollInterval){
-    clearInterval(pollInterval);
-  }
+  if(pollInterval) clearInterval(pollInterval);
 
   pollInterval=setInterval(async()=>{
-
     if(!activeToken) return;
 
     const {data}=await supabaseClient
@@ -163,7 +147,6 @@ function startPolling(){
     if(!data || data.length===0){
       resetScreen();
     }
-
   },1000);
 }
 
@@ -172,25 +155,17 @@ function resetScreen(){
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("startArea").classList.remove("hidden");
   document.getElementById("qrCode").innerHTML="";
-
   activeToken=null;
 
-  if(pollInterval){
-    clearInterval(pollInterval);
-    pollInterval=null;
-  }
-
-  if(countdownInterval){
-    clearInterval(countdownInterval);
-    countdownInterval=null;
-  }
+  if(pollInterval) clearInterval(pollInterval);
+  if(countdownInterval) clearInterval(countdownInterval);
 }
 
-/* ----------------- STABİL REDEEM SİSTEMİ ----------------- */
+/* ----------------- REDEEM SİSTEMİ ----------------- */
 
 let currentRedeem=null;
+let popupOpen=false;
 let processing=false;
-let lastShownRequestId=null;
 
 function maskPhone(phone){
   const digits=phone.replace(/\D/g,'');
@@ -201,6 +176,8 @@ function maskPhone(phone){
 
 async function checkRedeemRequests(){
 
+  if(popupOpen) return;
+
   const {data}=await supabaseClient
     .from("reward_redeem_requests")
     .select("*")
@@ -210,19 +187,14 @@ async function checkRedeemRequests(){
     .limit(1);
 
   if(data && data.length>0){
-
-    const request=data[0];
-
-    if(request.id===lastShownRequestId) return;
-
-    showRedeemPopup(request);
+    showRedeemPopup(data[0]);
   }
 }
 
 async function showRedeemPopup(request){
 
+  popupOpen=true;
   currentRedeem=request;
-  lastShownRequestId=request.id;
 
   const {data:customer}=await supabaseClient
     .from("customers")
@@ -230,10 +202,8 @@ async function showRedeemPopup(request){
     .eq("id",request.customer_id)
     .single();
 
-  const masked=maskPhone(customer.phone);
-
   document.getElementById("redeemCustomer").innerText=
-    "Müşteri: "+masked;
+    "Müşteri: "+maskPhone(customer.phone);
 
   document.getElementById("redeemReward").innerText=
     "Ödül: "+request.reward_type;
@@ -278,6 +248,7 @@ async function rejectRedeem(){
 function closePopup(){
   document.getElementById("redeemPopup").style.display="none";
   currentRedeem=null;
+  popupOpen=false;
   processing=false;
 }
 
