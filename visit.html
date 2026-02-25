@@ -4,11 +4,12 @@
   <title>Revizit - Ziyaret Onayı</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center h-screen">
+<body class="bg-gray-100 flex items-center justify-center h-screen overflow-hidden">
 
-<div class="bg-white p-8 rounded-2xl shadow-xl w-96 text-center space-y-6">
+<div class="bg-white p-8 rounded-2xl shadow-xl w-96 text-center space-y-6 relative">
 
   <h1 class="text-xl font-bold">Ziyaret Onayı</h1>
 
@@ -31,27 +32,22 @@
 
   <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
 
-    <!-- GERÇEKÇİ KARTON BARDAK -->
-    <div class="relative w-40 h-56">
+    <div class="relative w-40">
 
-      <!-- Kapak -->
-      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-gray-800 rounded-t-full"></div>
+      <img src="istockphoto-827973744-612x612.jpg"
+           class="w-full rounded-xl shadow-md"/>
 
-      <!-- Bardak Gövde -->
-      <div class="absolute top-5 left-1/2 -translate-x-1/2 w-28 h-44 bg-white border-4 border-gray-300 rounded-b-3xl overflow-hidden shadow-inner">
-
-        <!-- Kahve Dolum -->
-        <div id="coffeeFill"
-          class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-amber-800 to-amber-600 transition-all duration-700"
-          style="height:0%;">
-        </div>
-
+      <!-- Kahve Dolum -->
+      <div id="coffeeFill"
+           class="absolute bottom-0 left-0 w-full bg-amber-800 transition-all duration-700"
+           style="height:0%; border-radius:0 0 20px 20px;">
       </div>
 
-      <!-- Seviye Çizgileri -->
-      <div class="absolute top-16 left-1/2 -translate-x-1/2 w-20 border-t border-gray-300"></div>
-      <div class="absolute top-26 left-1/2 -translate-x-1/2 w-20 border-t border-gray-300"></div>
-      <div class="absolute top-36 left-1/2 -translate-x-1/2 w-20 border-t border-gray-300"></div>
+      <!-- Köpük -->
+      <div id="foam"
+           class="absolute bottom-0 left-0 w-full bg-white opacity-90 hidden"
+           style="height:20%; border-radius:50% 50% 0 0;">
+      </div>
 
     </div>
 
@@ -70,35 +66,31 @@ const supabaseClient = supabase.createClient(
   SUPABASE_ANON
 );
 
-let tokenData = null;
-let tokenValue = null;
+let tokenData=null;
+let tokenValue=null;
 
-const phoneInput = document.getElementById("phone");
-const confirmBtn = document.getElementById("confirmBtn");
+const phoneInput=document.getElementById("phone");
+const confirmBtn=document.getElementById("confirmBtn");
 
 /* TELEFON FORMAT */
 
-phoneInput?.addEventListener("input", function(e) {
-  let digits = e.target.value.replace(/\D/g, "");
-  if (digits.length > 11) digits = digits.slice(0,11);
+phoneInput?.addEventListener("input",function(e){
+  let digits=e.target.value.replace(/\D/g,"");
+  if(digits.length>11) digits=digits.slice(0,11);
 
-  let formatted = "";
-  if (digits.length > 0) formatted += digits.substring(0,4);
-  if (digits.length >= 5) formatted += " " + digits.substring(4,7);
-  if (digits.length >= 8) formatted += " " + digits.substring(7,11);
+  let formatted="";
+  if(digits.length>0) formatted+=digits.substring(0,4);
+  if(digits.length>=5) formatted+=" "+digits.substring(4,7);
+  if(digits.length>=8) formatted+=" "+digits.substring(7,11);
 
-  e.target.value = formatted;
+  e.target.value=formatted;
 
-  if(/^05\d{9}$/.test(digits)){
-    confirmBtn.disabled = false;
+  confirmBtn.disabled=!/^05\d{9}$/.test(digits);
+  if(!confirmBtn.disabled){
     confirmBtn.classList.remove("bg-gray-300","cursor-not-allowed");
     confirmBtn.classList.add("bg-black");
-  } else {
-    confirmBtn.disabled = true;
   }
 });
-
-function cleanPhone(v){ return v.replace(/\D/g,""); }
 
 /* INIT */
 
@@ -107,39 +99,29 @@ function getToken(){
 }
 
 async function init(){
-  tokenValue = getToken();
-  if(!tokenValue){ showError("Geçersiz QR."); return; }
+  tokenValue=getToken();
+  if(!tokenValue) return;
 
-  const { data } = await supabaseClient
+  const {data}=await supabaseClient
     .from("qr_tokens")
     .select("*")
     .eq("token",tokenValue)
     .single();
 
-  if(!data){ showError("QR geçersiz."); return; }
+  if(!data) return;
 
-  tokenData = data;
+  tokenData=data;
   document.getElementById("phoneArea").classList.remove("hidden");
-}
-
-function showError(msg){
-  document.getElementById("status").innerHTML =
-    `<p class="text-red-500 text-sm">${msg}</p>`;
 }
 
 /* ANA AKIŞ */
 
 async function completeVisit(){
 
-  const phone = cleanPhone(phoneInput.value);
-  if(!/^05\d{9}$/.test(phone)){
-    showError("Geçerli numara giriniz.");
-    return;
-  }
+  const phone=phoneInput.value.replace(/\D/g,"");
+  const businessId=tokenData.business_id;
 
-  const businessId = tokenData.business_id;
-
-  let { data:customer } = await supabaseClient
+  let {data:customer}=await supabaseClient
     .from("customers")
     .select("*")
     .eq("phone",phone)
@@ -147,21 +129,21 @@ async function completeVisit(){
     .single();
 
   if(!customer){
-    const { data:newCustomer } = await supabaseClient
+    const {data:newCustomer}=await supabaseClient
       .from("customers")
       .insert({
         phone,
         business_id:businessId,
         reward_available:true,
-        reward_progress:0
+        reward_progress:4
       })
       .select().single();
 
-    showReward(true,0,true);
+    await notifyCashier(businessId,"Yeni müşteri ödül kazandı 🎉");
+    showCup(4,"🎉 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.",true);
     return;
   }
 
-  // Eğer ödül varsa kullan
   if(customer.reward_available){
     await supabaseClient
       .from("customers")
@@ -171,23 +153,24 @@ async function completeVisit(){
       })
       .eq("id",customer.id);
 
-    showReward(false,1,false,true);
+    await notifyCashier(businessId,"Ödül Kullanıldı ☕");
+
+    showCup(1,"☕ Hediyenizi kullandınız! Yeni kahve yolculuğu başladı.");
     return;
   }
 
-  // Normal ziyaret → progress artır
-  let newProgress = customer.reward_progress + 1;
+  let newProgress=customer.reward_progress+1;
 
-  if(newProgress >= 4){
+  if(newProgress>=4){
     await supabaseClient
       .from("customers")
       .update({
         reward_available:true,
-        reward_progress:0
+        reward_progress:4
       })
       .eq("id",customer.id);
 
-    showReward(false,4,true);
+    showCup(4,"🎉 4/4 tamamlandı! Bir sonraki ziyaretinizde ücretsiz kahve kazanacaksınız!",true);
   } else {
     await supabaseClient
       .from("customers")
@@ -196,52 +179,51 @@ async function completeVisit(){
       })
       .eq("id",customer.id);
 
-    showReward(false,newProgress,false);
+    showCup(newProgress,newProgress+"/4 tamamlandı");
   }
 }
 
-/* GÖRSEL */
+/* BARDAK + EFEKT */
 
-function showReward(first,progress,earned,used=false){
-
-  document.getElementById("status").innerHTML =
-    `<p class="text-green-600 font-semibold">
-      Kaydınız tamamlandı.<br/>Ziyaretiniz başarıyla kaydedildi.
-     </p>`;
+function showCup(progress,message,celebrate=false){
 
   document.getElementById("phoneArea").classList.add("hidden");
   document.getElementById("cupArea").classList.remove("hidden");
 
-  let fill = progress * 25;
+  const fill=progress*25;
+
   setTimeout(()=>{
-    document.getElementById("coffeeFill").style.height = fill + "%";
+    document.getElementById("coffeeFill").style.height=fill+"%";
   },200);
 
-  if(first){
-    document.getElementById("rewardMessage").innerHTML =
-      "🎁 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.";
+  if(celebrate){
+    setTimeout(()=>{
+      document.getElementById("foam").classList.remove("hidden");
+      confetti({particleCount:80,spread:70,origin:{y:0.6}});
+    },500);
   }
-  else if(used){
-    document.getElementById("rewardMessage").innerHTML =
-      "☕ Ödülünüzü kullandınız! Yeni ödül yolculuğunuz başladı.";
-  }
-  else if(earned){
-    document.getElementById("rewardMessage").innerHTML =
-      "🎉 4/4 tamamlandı! Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
-  }
-  else{
-    document.getElementById("rewardMessage").innerHTML =
-      progress + "/4 tamamlandı";
-  }
+
+  document.getElementById("rewardMessage").innerHTML=message;
 
   setTimeout(()=>{
     window.location.href="about:blank";
-  },4500);
+  },5000);
+}
+
+/* KASİYER BİLDİRİMİ */
+
+async function notifyCashier(businessId,message){
+  await supabaseClient
+    .from("notifications")
+    .insert({
+      business_id:businessId,
+      message:message,
+      created_at:new Date()
+    });
 }
 
 init();
 
 </script>
-
 </body>
 </html>
