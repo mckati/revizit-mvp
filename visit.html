@@ -19,7 +19,6 @@
       maxlength="13"
       inputmode="numeric"
       class="border p-2 w-full rounded text-center text-lg tracking-wider"/>
-
     <button id="confirmBtn"
       onclick="completeVisit()"
       disabled
@@ -29,32 +28,41 @@
   </div>
 
   <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
-    <div class="relative w-44 h-64">
-      <svg viewBox="0 0 200 300" class="w-full h-full">
+
+    <div class="relative w-48 h-72">
+
+      <svg viewBox="0 0 200 320" class="w-full h-full">
 
         <defs>
           <clipPath id="cupClip">
-            <path d="M40 40 L160 40 L135 280 L65 280 Z" />
+            <path d="M50 40 L150 40 L130 300 L70 300 Z" />
           </clipPath>
+
           <linearGradient id="coffeeGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#b45309"/>
-            <stop offset="100%" stop-color="#78350f"/>
+            <stop offset="0%" stop-color="#c2410c"/>
+            <stop offset="100%" stop-color="#7c2d12"/>
           </linearGradient>
         </defs>
 
-        <path d="M40 40 L160 40 L135 280 L65 280 Z"
+        <!-- Bardak -->
+        <path d="M50 40 L150 40 L130 300 L70 300 Z"
               fill="#ffffff"
               stroke="#d1d5db"
               stroke-width="6"/>
 
+        <!-- Seviye Çizgileri -->
+        <line x1="70" y1="235" x2="130" y2="235" stroke="#d1d5db" stroke-width="2"/>
+        <line x1="70" y1="200" x2="130" y2="200" stroke="#d1d5db" stroke-width="2"/>
+        <line x1="70" y1="165" x2="130" y2="165" stroke="#d1d5db" stroke-width="2"/>
+
+        <!-- Kahve -->
         <rect id="coffeeFill"
               x="0"
               y="300"
               width="200"
               height="0"
               fill="url(#coffeeGrad)"
-              clip-path="url(#cupClip)" />
-
+              clip-path="url(#cupClip)"/>
       </svg>
     </div>
 
@@ -92,43 +100,38 @@ phoneInput.addEventListener("input",function(e){
   }
 });
 
-function cleanPhone(v){
-  return v.replace(/\D/g,""); // her zaman 05XXXXXXXXX formatı
-}
+function cleanPhone(v){ return v.replace(/\D/g,""); }
 
 async function init(){
+
   const token=new URLSearchParams(window.location.search).get("token");
 
-  const {data,error}=await supabaseClient
+  const {data}=await supabaseClient
     .from("qr_tokens")
     .select("*")
     .eq("token",token)
     .single();
 
-  if(error || !data){
-    alert("QR geçersiz.");
-    return;
-  }
-
   tokenData=data;
+
+  // 🔥 CİHAZDA DAHA ÖNCE KAYITLI TELEFON VAR MI?
+  const savedPhone=localStorage.getItem("revizit_phone_"+data.business_id);
+
+  if(savedPhone){
+    completeVisit(savedPhone,true);
+  }
 }
 
-async function completeVisit(){
+async function completeVisit(phoneOverride=null,auto=false){
 
-  const phone=cleanPhone(phoneInput.value);
+  const phone=phoneOverride || cleanPhone(phoneInput.value);
   const businessId=tokenData.business_id;
 
-  // 🔍 CUSTOMER'I GERÇEKTEN ARA
-  const {data:customers,error:findError}=await supabaseClient
+  let {data:customers}=await supabaseClient
     .from("customers")
     .select("*")
     .eq("business_id",businessId)
     .eq("phone",phone);
-
-  if(findError){
-    alert("Müşteri sorgu hatası");
-    return;
-  }
 
   let customer=customers.length>0 ? customers[0] : null;
 
@@ -137,32 +140,25 @@ async function completeVisit(){
   let message="";
 
   if(!customer){
-    // 🟢 GERÇEK YENİ MÜŞTERİ
-    const {data:newCustomer,error:createError}=await supabaseClient
+
+    const {data:newCustomer}=await supabaseClient
       .from("customers")
       .insert({
-        phone:phone,
+        phone,
         business_id:businessId,
         reward_available:true,
         reward_progress:4
       })
       .select();
 
-    if(createError){
-      alert("Müşteri oluşturulamadı");
-      return;
-    }
-
     progress=4;
     reward=true;
-    message="🎉 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.";
+    message="🎉 Bir sonraki ziyaretinizde ikinci kahveniz bizden!";
   }
   else{
-    // 🟡 MEVCUT MÜŞTERİ
 
     if(customer.reward_available){
       progress=1;
-      reward=false;
 
       await supabaseClient
         .from("customers")
@@ -172,9 +168,10 @@ async function completeVisit(){
         })
         .eq("id",customer.id);
 
-      message="☕ Hediyenizi kullandınız! Yeni kahve yolculuğu başladı.";
+      message="☕ Hediyenizi kullandınız!";
     }
     else{
+
       progress=customer.reward_progress+1;
 
       if(progress>=4){
@@ -189,7 +186,7 @@ async function completeVisit(){
           })
           .eq("id",customer.id);
 
-        message="🎉 4/4 tamamlandı! Yeni ödül kazandınız!";
+        message="🎉 Yeni ödül kazandınız!";
       }
       else{
         await supabaseClient
@@ -204,13 +201,14 @@ async function completeVisit(){
     }
   }
 
-  // 🧾 HER ZİYARETİ KAYDET
   await supabaseClient
     .from("visits")
     .insert({
       business_id:businessId,
       customer_phone:phone
     });
+
+  localStorage.setItem("revizit_phone_"+businessId,phone);
 
   animateCup(progress,reward,message);
 }
@@ -222,13 +220,13 @@ function animateCup(level,celebrate,message){
 
   const rect=document.getElementById("coffeeFill");
 
-  const maxHeight=240;
-  const targetHeight=(level/4)*maxHeight;
+  const cupHeight=260; // 40-300 arası iç yükseklik
+  const targetHeight=(level/4)*cupHeight;
 
   let current=0;
 
   const interval=setInterval(()=>{
-    current+=6;
+    current+=5;
     rect.setAttribute("y",300-current);
     rect.setAttribute("height",current);
 
@@ -238,7 +236,7 @@ function animateCup(level,celebrate,message){
   },16);
 
   if(celebrate){
-    confetti({particleCount:70,spread:60,origin:{y:0.6}});
+    confetti({particleCount:60,spread:60,origin:{y:0.6}});
   }
 
   document.getElementById("rewardMessage").innerHTML=message;
