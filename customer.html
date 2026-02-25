@@ -3,125 +3,126 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Revizit - Kahve Yolculuğun</title>
+<title>Revizit - Hesabım</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body class="bg-neutral-100 flex items-center justify-center min-h-screen">
+<body class="bg-neutral-100 p-6">
 
-<div class="bg-white w-[360px] rounded-3xl shadow-xl p-6 text-center">
+<h1 class="text-2xl font-semibold mb-6 text-center">Hesabım</h1>
 
-  <h1 class="text-2xl font-semibold mb-6">Kahve Yolculuğun</h1>
-
-  <div class="relative w-48 mx-auto mb-6">
-
-    <svg viewBox="0 0 200 200" class="w-full">
-
-      <path d="M40 50 L160 50 L150 150 L50 150 Z"
-            fill="#E5E5E5" stroke="#CFCFCF" stroke-width="3"/>
-
-      <path d="M160 70 Q190 100 160 130"
-            fill="none" stroke="#CFCFCF" stroke-width="8"/>
-
-      <clipPath id="cupClip">
-        <path d="M40 50 L160 50 L150 150 L50 150 Z"/>
-      </clipPath>
-
-      <rect id="coffeeFill"
-            x="0"
-            y="150"
-            width="200"
-            height="100"
-            fill="#4B2E2B"
-            clip-path="url(#cupClip)"/>
-
-    </svg>
-  </div>
-
-  <p id="visitText" class="text-lg font-medium mb-2"></p>
-  <p id="motivText" class="text-green-700 font-medium mb-6"></p>
-
-  <button id="rewardBtn"
-          class="w-full py-3 rounded-xl font-semibold transition-all duration-200">
-    Ödülünü Kullan
-  </button>
-
-</div>
+<div id="content" class="space-y-6"></div>
 
 <script>
 
 const SUPABASE_URL="https://hyqlhnraoumjsxaxefez.supabase.co";
 const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
-const customerId = localStorage.getItem("customer_id");
+const phone=localStorage.getItem("revizit_global_phone");
 
-const coffee = document.getElementById("coffeeFill");
-const visitText = document.getElementById("visitText");
-const motivText = document.getElementById("motivText");
-const btn = document.getElementById("rewardBtn");
-
-if(!customerId){
-  document.body.innerHTML="<p class='text-center mt-10'>Müşteri bulunamadı. Lütfen tekrar QR okutun.</p>";
+if(!phone){
+  document.getElementById("content").innerHTML=
+    "<p class='text-center'>Müşteri bulunamadı.</p>";
 }else{
-  loadCustomer();
+  loadData();
 }
 
-async function loadCustomer(){
+async function loadData(){
 
-  const {data:customer}=await supabaseClient
+  const {data:customers}=await supabaseClient
     .from("customers")
     .select("*")
-    .eq("id",customerId)
-    .single();
+    .eq("phone",phone);
 
-  if(!customer){
-    document.body.innerHTML="<p class='text-center mt-10'>Müşteri kaydı bulunamadı.</p>";
+  if(!customers || customers.length===0){
+    document.getElementById("content").innerHTML=
+      "<p class='text-center'>Kayıt bulunamadı.</p>";
     return;
   }
 
-  let visits = customer.reward_progress;
-  let fillPercent = (visits / 4) * 100;
+  let html="";
 
-  coffee.setAttribute("y", 150 - fillPercent);
+  for(const customer of customers){
 
-  visitText.innerText = visits + " / 4 Ziyaret";
+    const {data:business}=await supabaseClient
+      .from("businesses")
+      .select("name")
+      .eq("id",customer.business_id)
+      .single();
 
-  if(visits < 4){
+    let fillPercent=(customer.reward_progress/4)*100;
 
-    motivText.innerText = "Ödül 4. ziyarette aktif olur";
+    html+=`
+      <div class="bg-white rounded-3xl shadow-xl p-6 text-center space-y-4">
 
-    btn.classList.add("bg-gray-300","text-white");
-    btn.disabled = true;
-    btn.style.cursor = "not-allowed";
+        <h2 class="text-lg font-semibold">📍 ${business.name}</h2>
+
+        <div class="relative w-40 mx-auto">
+
+          <svg viewBox="0 0 200 200" class="w-full">
+            <path d="M40 50 L160 50 L150 150 L50 150 Z"
+                  fill="#E5E5E5" stroke="#CFCFCF" stroke-width="3"/>
+            <path d="M160 70 Q190 100 160 130"
+                  fill="none" stroke="#CFCFCF" stroke-width="8"/>
+            <clipPath id="cupClip${customer.id}">
+              <path d="M40 50 L160 50 L150 150 L50 150 Z"/>
+            </clipPath>
+            <rect x="0"
+                  y="${150-fillPercent}"
+                  width="200"
+                  height="100"
+                  fill="#4B2E2B"
+                  clip-path="url(#cupClip${customer.id})"/>
+          </svg>
+
+        </div>
+
+        <p>${customer.reward_progress} / 4 Ziyaret</p>
+    `;
+
+    if(customer.reward_available){
+      html+=`
+        <button onclick="requestReward('${customer.id}','${customer.business_id}')"
+          class="bg-green-600 text-white w-full py-2 rounded-xl">
+          Ödülünü Kullan
+        </button>
+      `;
+    }
+
+    const {data:history}=await supabaseClient
+      .from("rewards_history")
+      .select("*")
+      .eq("customer_id",customer.id)
+      .order("redeemed_at",{ascending:false});
+
+    if(history && history.length>0){
+      html+=`<div class="text-sm text-left mt-4 border-t pt-3">`;
+      history.forEach(item=>{
+        html+=`
+          <div>
+            ${item.reward_type} - 
+            ${new Date(item.redeemed_at).toLocaleDateString()}
+          </div>
+        `;
+      });
+      html+=`</div>`;
+    }
+
+    html+=`</div>`;
   }
 
-  if(visits === 4 && customer.reward_available){
-
-    motivText.innerText = "Ödül Hazır 🎉";
-
-    btn.classList.add("bg-green-600","text-white","shadow-lg");
-    btn.disabled = false;
-    btn.style.cursor = "pointer";
-
-    btn.onclick = requestReward;
-  }
+  document.getElementById("content").innerHTML=html;
 }
 
-async function requestReward(){
-
-  const {data:customer}=await supabaseClient
-    .from("customers")
-    .select("business_id")
-    .eq("id",customerId)
-    .single();
+async function requestReward(customerId,businessId){
 
   await supabaseClient
     .from("reward_redeem_requests")
     .insert({
-      business_id:customer.business_id,
+      business_id:businessId,
       customer_id:customerId,
       reward_type:"second_coffee_free",
       status:"pending"
@@ -131,6 +132,5 @@ async function requestReward(){
 }
 
 </script>
-
 </body>
 </html>
