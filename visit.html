@@ -29,49 +29,36 @@
   </div>
 
   <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
-
     <div class="relative w-44 h-64">
-
-      <!-- Bardak SVG -->
       <svg viewBox="0 0 200 300" class="w-full h-full">
 
-        <!-- Bardak Mask -->
         <defs>
           <clipPath id="cupClip">
             <path d="M40 40 L160 40 L135 280 L65 280 Z" />
           </clipPath>
-        </defs>
-
-        <!-- Gövde -->
-        <path d="M40 40 L160 40 L135 280 L65 280 Z"
-              fill="#ffffff"
-              stroke="#d1d5db"
-              stroke-width="6"/>
-
-        <!-- Kahve -->
-        <rect id="coffeeFill"
-              x="0"
-              y="300"
-              width="200"
-              height="0"
-              fill="url(#coffeeGrad)"
-              clip-path="url(#cupClip)"
-              />
-
-        <!-- Gradient -->
-        <defs>
           <linearGradient id="coffeeGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#b45309"/>
             <stop offset="100%" stop-color="#78350f"/>
           </linearGradient>
         </defs>
 
-      </svg>
+        <path d="M40 40 L160 40 L135 280 L65 280 Z"
+              fill="#ffffff"
+              stroke="#d1d5db"
+              stroke-width="6"/>
 
+        <rect id="coffeeFill"
+              x="0"
+              y="300"
+              width="200"
+              height="0"
+              fill="url(#coffeeGrad)"
+              clip-path="url(#cupClip)" />
+
+      </svg>
     </div>
 
     <div id="rewardMessage" class="text-sm font-medium"></div>
-
   </div>
 
 </div>
@@ -105,16 +92,23 @@ phoneInput.addEventListener("input",function(e){
   }
 });
 
-function cleanPhone(v){ return v.replace(/\D/g,""); }
+function cleanPhone(v){
+  return v.replace(/\D/g,""); // her zaman 05XXXXXXXXX formatı
+}
 
 async function init(){
   const token=new URLSearchParams(window.location.search).get("token");
 
-  const {data}=await supabaseClient
+  const {data,error}=await supabaseClient
     .from("qr_tokens")
     .select("*")
     .eq("token",token)
     .single();
+
+  if(error || !data){
+    alert("QR geçersiz.");
+    return;
+  }
 
   tokenData=data;
 }
@@ -124,37 +118,49 @@ async function completeVisit(){
   const phone=cleanPhone(phoneInput.value);
   const businessId=tokenData.business_id;
 
-  let {data:customer}=await supabaseClient
+  // 🔍 CUSTOMER'I GERÇEKTEN ARA
+  const {data:customers,error:findError}=await supabaseClient
     .from("customers")
     .select("*")
-    .eq("phone",phone)
     .eq("business_id",businessId)
-    .single();
+    .eq("phone",phone);
+
+  if(findError){
+    alert("Müşteri sorgu hatası");
+    return;
+  }
+
+  let customer=customers.length>0 ? customers[0] : null;
 
   let progress=0;
   let reward=false;
   let message="";
 
   if(!customer){
-
-    const {data:newCustomer}=await supabaseClient
+    // 🟢 GERÇEK YENİ MÜŞTERİ
+    const {data:newCustomer,error:createError}=await supabaseClient
       .from("customers")
       .insert({
-        phone,
+        phone:phone,
         business_id:businessId,
         reward_available:true,
         reward_progress:4
       })
-      .select().single();
+      .select();
+
+    if(createError){
+      alert("Müşteri oluşturulamadı");
+      return;
+    }
 
     progress=4;
     reward=true;
     message="🎉 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.";
   }
   else{
+    // 🟡 MEVCUT MÜŞTERİ
 
     if(customer.reward_available){
-
       progress=1;
       reward=false;
 
@@ -169,7 +175,6 @@ async function completeVisit(){
       message="☕ Hediyenizi kullandınız! Yeni kahve yolculuğu başladı.";
     }
     else{
-
       progress=customer.reward_progress+1;
 
       if(progress>=4){
@@ -199,7 +204,7 @@ async function completeVisit(){
     }
   }
 
-  // HER ZİYARETİ KAYDET
+  // 🧾 HER ZİYARETİ KAYDET
   await supabaseClient
     .from("visits")
     .insert({
@@ -217,13 +222,13 @@ function animateCup(level,celebrate,message){
 
   const rect=document.getElementById("coffeeFill");
 
-  const maxHeight=240; // yaklaşık iç yükseklik
+  const maxHeight=240;
   const targetHeight=(level/4)*maxHeight;
 
   let current=0;
 
   const interval=setInterval(()=>{
-    current+=5;
+    current+=6;
     rect.setAttribute("y",300-current);
     rect.setAttribute("height",current);
 
@@ -242,6 +247,5 @@ function animateCup(level,celebrate,message){
 init();
 
 </script>
-
 </body>
 </html>
