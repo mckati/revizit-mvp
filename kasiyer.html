@@ -6,7 +6,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center h-screen">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
 <div class="bg-white p-8 rounded-xl shadow w-96 text-center space-y-6">
 
@@ -28,8 +28,10 @@
     <button onclick="createQR('1001+')" class="w-full border p-2 rounded">1001+</button>
   </div>
 
+  <!-- QR ALANI -->
   <div id="qrArea" class="hidden space-y-4">
-    <div id="qrCode"></div>
+
+    <div id="qrCode" class="flex justify-center items-center"></div>
 
     <div>
       <div class="w-full bg-gray-200 h-2 rounded">
@@ -39,6 +41,7 @@
       </div>
       <p id="countdown" class="text-sm mt-1">15</p>
     </div>
+
   </div>
 
   <p id="debug" class="text-red-500 text-xs"></p>
@@ -95,7 +98,7 @@ async function createQR(band){
       token;
 
     document.getElementById("qrCode").innerHTML =
-      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" />`;
+      `<img class="mx-auto" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" />`;
 
     startCountdown();
 
