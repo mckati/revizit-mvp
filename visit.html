@@ -7,9 +7,9 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center h-screen overflow-hidden">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-<div class="bg-white p-8 rounded-2xl shadow-xl w-96 text-center space-y-6 relative">
+<div class="bg-white p-8 rounded-2xl shadow-xl w-96 text-center space-y-6">
 
   <h1 class="text-xl font-bold">Ziyaret Onayı</h1>
 
@@ -32,26 +32,32 @@
 
   <div id="cupArea" class="hidden flex flex-col items-center space-y-4">
 
-    <div class="relative w-40">
+    <div class="relative w-44 h-64">
 
-      <img src="istockphoto-827973744-612x612.jpg"
-           class="w-full rounded-xl shadow-md"/>
+      <!-- Bardak Gövde -->
+      <div class="absolute inset-0 border-4 border-gray-300 rounded-b-[90px] rounded-t-[30px] overflow-hidden bg-white shadow-inner">
 
-      <!-- Kahve Dolum -->
-      <div id="coffeeFill"
-           class="absolute bottom-0 left-0 w-full bg-amber-800 transition-all duration-700"
-           style="height:0%; border-radius:0 0 20px 20px;">
+        <!-- Kahve -->
+        <div id="coffeeFill"
+             class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-amber-900 to-amber-600 transition-all duration-1000 ease-out"
+             style="height:0%;">
+        </div>
+
+        <!-- Köpük -->
+        <div id="foam"
+             class="absolute left-0 w-full bg-white opacity-95 hidden"
+             style="height:25px; bottom:0; border-radius:50%; transition: all 0.6s ease;">
+        </div>
+
       </div>
 
-      <!-- Köpük -->
-      <div id="foam"
-           class="absolute bottom-0 left-0 w-full bg-white opacity-90 hidden"
-           style="height:20%; border-radius:50% 50% 0 0;">
-      </div>
+      <!-- Kapak -->
+      <div class="absolute -top-4 left-1/2 -translate-x-1/2 w-40 h-8 bg-gray-800 rounded-full shadow"></div>
 
     </div>
 
     <div id="rewardMessage" class="text-sm font-medium"></div>
+
   </div>
 
 </div>
@@ -60,11 +66,7 @@
 
 const SUPABASE_URL = "https://hyqlhnraoumjsxaxefez.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cWxobnJhb3VtanN4YXhlZmV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTI2NzcsImV4cCI6MjA4NzUyODY3N30.GpeVAVBQEoqU_CTw8jehBra4Z5RrAmcEV9qYLp-g02U";
-
-const supabaseClient = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON
-);
+const supabaseClient = supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
 let tokenData=null;
 let tokenValue=null;
@@ -129,18 +131,17 @@ async function completeVisit(){
     .single();
 
   if(!customer){
-    const {data:newCustomer}=await supabaseClient
+    await supabaseClient
       .from("customers")
       .insert({
         phone,
         business_id:businessId,
         reward_available:true,
         reward_progress:4
-      })
-      .select().single();
+      });
 
-    await notifyCashier(businessId,"Yeni müşteri ödül kazandı 🎉");
-    showCup(4,"🎉 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.",true);
+    animateCup(4,true,"🎉 Tebrikler! Bir sonraki ziyaretinizde ikinci kahveniz bizden.");
+    confetti({particleCount:80,spread:70,origin:{y:0.6}});
     return;
   }
 
@@ -153,9 +154,7 @@ async function completeVisit(){
       })
       .eq("id",customer.id);
 
-    await notifyCashier(businessId,"Ödül Kullanıldı ☕");
-
-    showCup(1,"☕ Hediyenizi kullandınız! Yeni kahve yolculuğu başladı.");
+    animateCup(1,false,"☕ Hediyenizi kullandınız! Yeni kahve yolculuğu başladı.");
     return;
   }
 
@@ -170,7 +169,8 @@ async function completeVisit(){
       })
       .eq("id",customer.id);
 
-    showCup(4,"🎉 4/4 tamamlandı! Bir sonraki ziyaretinizde ücretsiz kahve kazanacaksınız!",true);
+    animateCup(4,true,"🎉 4/4 tamamlandı! Yeni ödül kazandınız!");
+    confetti({particleCount:70,spread:60,origin:{y:0.6}});
   } else {
     await supabaseClient
       .from("customers")
@@ -179,47 +179,32 @@ async function completeVisit(){
       })
       .eq("id",customer.id);
 
-    showCup(newProgress,newProgress+"/4 tamamlandı");
+    animateCup(newProgress,false,newProgress+"/4 tamamlandı");
   }
 }
 
-/* BARDAK + EFEKT */
+/* GERÇEKÇİ DOLUM */
 
-function showCup(progress,message,celebrate=false){
+function animateCup(level,celebrate,message){
 
   document.getElementById("phoneArea").classList.add("hidden");
   document.getElementById("cupArea").classList.remove("hidden");
 
-  const fill=progress*25;
+  const fillHeight = level * 25;
 
   setTimeout(()=>{
-    document.getElementById("coffeeFill").style.height=fill+"%";
-  },200);
+    document.getElementById("coffeeFill").style.height = fillHeight + "%";
+  },300);
 
   if(celebrate){
     setTimeout(()=>{
-      document.getElementById("foam").classList.remove("hidden");
-      confetti({particleCount:80,spread:70,origin:{y:0.6}});
-    },500);
+      const foam=document.getElementById("foam");
+      foam.classList.remove("hidden");
+      foam.style.bottom = fillHeight + "%";
+    },1000);
   }
 
-  document.getElementById("rewardMessage").innerHTML=message;
-
-  setTimeout(()=>{
-    window.location.href="about:blank";
-  },5000);
-}
-
-/* KASİYER BİLDİRİMİ */
-
-async function notifyCashier(businessId,message){
-  await supabaseClient
-    .from("notifications")
-    .insert({
-      business_id:businessId,
-      message:message,
-      created_at:new Date()
-    });
+  document.getElementById("rewardMessage").innerHTML = message;
 }
 
 init();
