@@ -89,7 +89,7 @@ let activeToken=null;
 let pollInterval=null;
 let countdownInterval=null;
 
-/* ----------------- MEVCUT ZİYARET SİSTEMİ (DEĞİŞMEDİ) ----------------- */
+/* ----------------- MEVCUT ZİYARET SİSTEMİ ----------------- */
 
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
@@ -188,11 +188,15 @@ function resetScreen(){
   }
 }
 
-/* ----------------- REDEEM SİSTEMİ (YENİ EKLENDİ) ----------------- */
+/* ----------------- GÜVENLİ REDEEM SİSTEMİ ----------------- */
 
 let currentRedeem=null;
+let popupOpen=false;
+let processing=false;
 
 async function checkRedeemRequests(){
+
+  if(popupOpen) return;
 
   const {data}=await supabaseClient
     .from("reward_redeem_requests")
@@ -209,6 +213,7 @@ async function checkRedeemRequests(){
 
 async function showRedeemPopup(request){
 
+  popupOpen=true;
   currentRedeem=request;
 
   const {data:customer}=await supabaseClient
@@ -228,10 +233,14 @@ async function showRedeemPopup(request){
 
 async function approveRedeem(){
 
+  if(processing) return;
+  processing=true;
+
   await supabaseClient
     .from("reward_redeem_requests")
     .update({status:"approved"})
-    .eq("id",currentRedeem.id);
+    .eq("id",currentRedeem.id)
+    .eq("status","pending");
 
   await supabaseClient.rpc("redeem_reward",{
     customer_uuid:currentRedeem.customer_id,
@@ -239,17 +248,28 @@ async function approveRedeem(){
     visit_uuid:crypto.randomUUID()
   });
 
-  document.getElementById("redeemPopup").style.display="none";
+  closePopup();
 }
 
 async function rejectRedeem(){
 
+  if(processing) return;
+  processing=true;
+
   await supabaseClient
     .from("reward_redeem_requests")
     .update({status:"rejected"})
-    .eq("id",currentRedeem.id);
+    .eq("id",currentRedeem.id)
+    .eq("status","pending");
 
+  closePopup();
+}
+
+function closePopup(){
   document.getElementById("redeemPopup").style.display="none";
+  currentRedeem=null;
+  popupOpen=false;
+  processing=false;
 }
 
 setInterval(checkRedeemRequests,3000);
