@@ -40,7 +40,8 @@ const BUSINESS_ID="c95e305c-adde-4dd5-8cc9-40f8c51bbc74";
 
 const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
 
-let channel;
+let activeToken=null;
+let pollInterval=null;
 
 function showBands(){
   document.getElementById("startArea").classList.add("hidden");
@@ -50,6 +51,7 @@ function showBands(){
 async function createQR(band){
 
   const token=crypto.randomUUID();
+  activeToken=token;
 
   await supabaseClient.from("qr_tokens").insert({
     token,
@@ -66,24 +68,44 @@ async function createQR(band){
   document.getElementById("qrCode").innerHTML=
     `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" />`;
 
-  // REALTIME DİNLE
-  channel=supabaseClient
-    .channel("qr-watch")
-    .on("postgres_changes",
-      {event:"DELETE",schema:"public",table:"qr_tokens"},
-      payload=>{
-        if(payload.old.token===token){
-          resetScreen();
-        }
-      })
-    .subscribe();
+  startPolling();
+}
+
+function startPolling(){
+
+  if(pollInterval){
+    clearInterval(pollInterval);
+  }
+
+  pollInterval=setInterval(async()=>{
+
+    if(!activeToken) return;
+
+    const {data}=await supabaseClient
+      .from("qr_tokens")
+      .select("token")
+      .eq("token",activeToken);
+
+    // Eğer token artık yoksa → reset
+    if(!data || data.length===0){
+      resetScreen();
+    }
+
+  },1000); // her 1 saniye kontrol
 }
 
 function resetScreen(){
+
   document.getElementById("qrArea").classList.add("hidden");
   document.getElementById("startArea").classList.remove("hidden");
   document.getElementById("qrCode").innerHTML="";
-  if(channel) supabaseClient.removeChannel(channel);
+
+  activeToken=null;
+
+  if(pollInterval){
+    clearInterval(pollInterval);
+    pollInterval=null;
+  }
 }
 
 </script>
